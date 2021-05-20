@@ -6,15 +6,17 @@
 </head>
 
 <body>
-    <h1 id="windspeed">Hello, world!</h1>
+    <h1 id="windspeed">Wind speed: ${currentWindSpeed}</h1>
+    <button id="refreshButton"> Refresh </button>
 
-    <script>
-        window.onload = function(){
-            var lengthOfName = name.length
-        
-            document.getElementById('windspeed').innerHTML = currentWindSpeed;
-        };
-    </script>
+<script>
+    document.getElementById("refreshButton").onclick = function() {myFunction()};
+
+    function myFunction() {
+        console.log("Clicked button")
+        document.getElementById("windspeed").innerHTML = "Wind speed: dkjbasdkljasnjkd";
+    }
+</script>
 </body>
 
 </html>
