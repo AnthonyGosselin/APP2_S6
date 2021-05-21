@@ -6,9 +6,9 @@
  */
 
 TCPClient client;
-byte server[] = { 192, 168, 0, 106 };
+byte server[] = { 192, 168, 0, 104 };
 
-//int i = 0;
+int i = 0;
 
 // setup() runs once, when the device is first turned on.
 void setup() {
@@ -23,21 +23,22 @@ void setup() {
 void loop() {
   // The core of your code will likely live here.
   //Serial.printlnf("Counting: %d", i++);
-  delay(100);
+  delay(1000);
+  i++;
 
   // POST Message
   if(client.connect(server, 3000))
   {
     // Print some information that we have connected to the server
     Serial.println("**********************************!");
-    Serial.println("New POST Connection!");
+    Serial.printlnf("New POST Connection!: %d", i);
     Serial.println("Connection OK!");
 
     char* postVal = "{\"windSpeed\":\"420\"}";
             
     // Send our HTTP data!
     client.println("POST /json HTTP/1.0");
-    client.println("Host: 192.168.0.106:3000");
+    client.println("Host: 192.168.0.104:3000"); // ************ HARDCODED HOST IP??
     client.println("Content-Type: application/json");
     client.print("Content-Length: ");
     client.println(strlen(postVal));
