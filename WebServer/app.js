@@ -6,8 +6,8 @@ app.use(express.json());
 const port = 3000;
 
 // CURRENT VALUES 
-var currentWindSpeed = -1
-var currentTemperature = -1
+var currentWindSpeed = undefined
+var currentTemperature = undefined
 
 // Html content with most recent values
 function newHtmlContent() {

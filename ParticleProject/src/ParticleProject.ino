@@ -34,7 +34,11 @@ void loop() {
     Serial.printlnf("New POST Connection!: %d", i);
     Serial.println("Connection OK!");
 
-    char* postVal = "{\"windSpeed\":\"420\"}";
+    char* postVal = ""
+    "{"
+      "\"windSpeed\": 420,"
+      "\"temperature\": 23"
+    "}";
             
     // Send our HTTP data!
     client.println("POST / HTTP/1.0");
@@ -65,3 +69,31 @@ void loop() {
       Serial.println("Server connection failed. Trying again...");
   } 
 }
+
+/*
+GOOGLE MAPS LOCATION INTEGRATION:
+
+#include <google-maps-device-locator.h>
+
+GoogleMapsDeviceLocator locator;
+
+void setup() {
+  Serial.begin(9600);
+  // Scan for visible networks and publish to the cloud every 30 seconds
+  // Pass the returned location to be handled by the locationCallback() method
+  locator.withSubscribe(locationCallback).withLocatePeriodic(30);
+}
+
+void locationCallback(float lat, float lon, float accuracy) {
+  // Handle the returned location data for the device. This method is passed three arguments:
+  // - Latitude
+  // - Longitude
+  // - Accuracy of estimated location (in meters)
+  Serial.printlnf("Current location: %f, %f (%f)", lat, lon, accuracy);
+}
+
+void loop() {
+  locator.loop();
+}
+        
+*/
