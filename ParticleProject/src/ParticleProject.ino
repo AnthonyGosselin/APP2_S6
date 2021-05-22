@@ -6,7 +6,7 @@
  */
 
 TCPClient client;
-byte server[] = { 192, 168, 0, 104 };
+byte server[] = { 192, 168, 1, 6 };
 
 int i = 0;
 
@@ -37,8 +37,8 @@ void loop() {
     char* postVal = "{\"windSpeed\":\"420\"}";
             
     // Send our HTTP data!
-    client.println("POST /json HTTP/1.0");
-    client.println("Host: 192.168.0.104:3000"); // ************ HARDCODED HOST IP??
+    client.println("POST / HTTP/1.0");
+    client.println("Host: 192.168.1.6:3000"); // ************ HARDCODED HOST IP??
     client.println("Content-Type: application/json");
     client.print("Content-Length: ");
     client.println(strlen(postVal));
