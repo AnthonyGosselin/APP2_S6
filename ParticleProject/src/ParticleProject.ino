@@ -1,7 +1,8 @@
 #include <../lib/google-maps-device-locator/src/google-maps-device-locator.h>
 
 TCPClient client;
-byte server[] = { 192, 168, 1, 6 };
+byte server[] = { 192, 168, 0, 106 };
+//byte server[] = { 192, 168, 1, 6 };
 
 float _latitude;
 float _longitude;
@@ -10,7 +11,7 @@ float _accuracy;
 
 GoogleMapsDeviceLocator locator;
 
-//int i = 0;
+int i = 0;
 
 // setup() runs once, when the device is first turned on.
 void setup() {
@@ -88,33 +89,7 @@ void loop() {
   {
       Serial.println("Server connection failed. Trying again...");
   } 
+
+  i++;
   
 }
-
-/*
-GOOGLE MAPS LOCATION INTEGRATION:
-
-#include <google-maps-device-locator.h>
-
-GoogleMapsDeviceLocator locator;
-
-void setup() {
-  Serial.begin(9600);
-  // Scan for visible networks and publish to the cloud every 30 seconds
-  // Pass the returned location to be handled by the locationCallback() method
-  locator.withSubscribe(locationCallback).withLocatePeriodic(30);
-}
-
-void locationCallback(float lat, float lon, float accuracy) {
-  // Handle the returned location data for the device. This method is passed three arguments:
-  // - Latitude
-  // - Longitude
-  // - Accuracy of estimated location (in meters)
-  Serial.printlnf("Current location: %f, %f (%f)", lat, lon, accuracy);
-}
-
-void loop() {
-  locator.loop();
-}
-        
-*/
