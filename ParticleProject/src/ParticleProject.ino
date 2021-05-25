@@ -1,6 +1,6 @@
 #include <../lib/google-maps-device-locator/src/google-maps-device-locator.h>
 
-TCPClient client;
+/*TCPClient client;
 byte server[] = { 192, 168, 0, 106 };
 //byte server[] = { 192, 168, 1, 6 };
 
@@ -89,7 +89,7 @@ void loop() {
       Serial.println("Server connection failed. Trying again...");
   } 
 
-}
+}*/
 
 #include <math.h>
 
