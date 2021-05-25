@@ -1,7 +1,7 @@
 #include <../lib/google-maps-device-locator/src/google-maps-device-locator.h>
 
 TCPClient client;
-byte server[] = { 192, 168, 0, 106 };
+byte server[] = { 192, 168, 1, 6 };
 
 float _latitude;
 float _longitude;
@@ -51,14 +51,18 @@ void loop() {
   {
     // Print some information that we have connected to the server
     Serial.println("**********************************!");
-    Serial.println("New POST Connection!");
+    Serial.printlnf("New POST Connection!: %d", i);
     Serial.println("Connection OK!");
 
-    char* postVal = "{\"windSpeed\":\"420\"}";
+    char* postVal = ""
+    "{"
+      "\"windSpeed\": 420,"
+      "\"temperature\": 23"
+    "}";
             
     // Send our HTTP data!
-    client.println("POST /json HTTP/1.0");
-    client.println("Host: 192.168.0.106:3000");
+    client.println("POST / HTTP/1.0");
+    client.println("Host: 192.168.1.6:3000"); // ************ HARDCODED HOST IP??
     client.println("Content-Type: application/json");
     client.print("Content-Length: ");
     client.println(strlen(postVal));
@@ -86,3 +90,31 @@ void loop() {
   } 
   
 }
+
+/*
+GOOGLE MAPS LOCATION INTEGRATION:
+
+#include <google-maps-device-locator.h>
+
+GoogleMapsDeviceLocator locator;
+
+void setup() {
+  Serial.begin(9600);
+  // Scan for visible networks and publish to the cloud every 30 seconds
+  // Pass the returned location to be handled by the locationCallback() method
+  locator.withSubscribe(locationCallback).withLocatePeriodic(30);
+}
+
+void locationCallback(float lat, float lon, float accuracy) {
+  // Handle the returned location data for the device. This method is passed three arguments:
+  // - Latitude
+  // - Longitude
+  // - Accuracy of estimated location (in meters)
+  Serial.printlnf("Current location: %f, %f (%f)", lat, lon, accuracy);
+}
+
+void loop() {
+  locator.loop();
+}
+        
+*/

@@ -1,16 +1,17 @@
-const http = require('http');
-const fs = require('fs')
+const express = require('express');
 
-const hostname = '127.0.0.1';
+const app = express();
+app.use(express.json());
+
 const port = 3000;
 
 // CURRENT VALUES 
-var currentWindSpeed = -1
-var currentTemperature = -1
+var currentWindSpeed = undefined
+var currentTemperature = undefined
 
 // Html content with most recent values
 function newHtmlContent() {
-    return `
+	return `
     <!doctype html>
     <html lang="en">
 
@@ -27,39 +28,29 @@ function newHtmlContent() {
     `
 }
 
-// Configure server responses
-const server = http.createServer((req, res) => {
-    if (req.method === 'POST') {
-        console.log("Received POST")
+function renderPage(res) {
+	// Render page
+	res.writeHead(200, {'Content-Type': 'text/html'});
+	res.write(newHtmlContent())
+	res.end()
+}
 
-        var jsonString = ''
-        req.on('data', function (data) {
-            jsonString += data
-        })
-        req.on('end', function() {
-            var jsonData = JSON.parse(jsonString)
+app.get('/', (req, res) => {
+  	console.log("Received GET")
+ 	renderPage(res)
+})
 
-            var windSpeed = jsonData.windSpeed
-            var temperature = jsonData.temperature
-            console.log('Wind speed: \{windSpeed}')
+app.post('/', (req, res) => {
 
-            currentWindSpeed = windSpeed
-            currentTemperature = temperature
-        })
-    }
-    if (req.method === "GET") {
-        console.log("Received GET")
-    }
+	// Load values from JSON
+	var jsonData = req.body
+	currentWindSpeed = jsonData.windSpeed
+	currentTemperature = jsonData.temperature
 
-    // Render page
-    res.writeHead(200, {'Content-Type': 'text/html'});
-    res.write(newHtmlContent())
-    res.end()
+  	console.log("Received POST:", jsonData)
+  	renderPage(res)
 });
 
-// Start listening
-server.listen(port, hostname, () => {
-  console.log(`Server running at http://${hostname}:${port}/`);
-});
-
-
+app.listen(port, () => {
+	console.log(`Example app listening at http://localhost:${port}`)
+})
