@@ -1,12 +1,14 @@
-/*
- * Project ParticleProject
- * Description:
- * Author:
- * Date:
- */
+#include <../lib/google-maps-device-locator/src/google-maps-device-locator.h>
 
 TCPClient client;
 byte server[] = { 192, 168, 0, 106 };
+
+float _latitude;
+float _longitude;
+float _accuracy;
+
+
+GoogleMapsDeviceLocator locator;
 
 //int i = 0;
 
@@ -17,13 +19,32 @@ void setup() {
 
   waitFor(Serial.isConnected, 30000);
   Serial.println("Started");
+  locator.withSubscribe(locationCallback).withLocatePeriodic(30);
 }
+
+void locationCallback(float lat, float lon, float accuracy) {
+  // Handle the returned location data for the device. This method is passed three arguments:
+  _latitude = lat;
+  _longitude = lon;
+  _accuracy = accuracy;
+
+  Serial.println("Google Maps:");
+  Serial.print("Latitude: ");
+  Serial.println(_latitude);
+  Serial.print("Longitude: ");
+  Serial.println(_longitude);
+  Serial.print("Accuracy: ");
+  Serial.println(_accuracy);
+}
+
 
 // loop() runs over and over again, as quickly as it can execute.
 void loop() {
   // The core of your code will likely live here.
   //Serial.printlnf("Counting: %d", i++);
-  delay(100);
+  delay(1000);
+
+  locator.loop();
 
   // POST Message
   if(client.connect(server, 3000))
@@ -63,4 +84,5 @@ void loop() {
   {
       Serial.println("Server connection failed. Trying again...");
   } 
+  
 }
