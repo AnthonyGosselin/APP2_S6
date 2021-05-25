@@ -129,6 +129,12 @@ void printDec(char* text, int value) {
 	Serial.println();
 }
 
+void printFloat(char* text, float value) {
+	Serial.print(text);
+	Serial.print(value);
+	Serial.println();
+}
+
 int comp2(int binary_input, int num_bit) {
 
 	// Check if negative number
@@ -221,7 +227,56 @@ void getValuesBarometer() {
 	printDec("Final temperature t_comp: ", t_comp);
 }
 
+// float addDecimals(int integral, int decimal, int decimalPlaces) {
+// 	float intToFloat = integral;
+// 	for (int i = 1; i < decimalPlaces+1; i++) {
+// 		int decimalPosition = decimal % pow(10, i);
+// 		intToFloat += pow(decimalPosition, -i);
+// 	}
+// }
+
 void getValuesHumidity() {
+	int dhtPin = D4;
+	// Start signal
+	digitalWrite(dhtPin, LOW);
+	delay(25);
+	digitalWrite(dhtPin, HIGH);
+
+	int dhtResponseLowTime = pulseIn(dhtPin, LOW);
+	delayMicroseconds(100);
+
+	uint8_t dataBits[5];
+	int dataBitsIndex = 0;
+	for (int i = 1; i < 41; i++) {
+		int pulseTime = pulseIn(dhtPin, HIGH);
+
+		if (pulseTime < 50) {
+			dataBits[dataBitsIndex] = dataBits[dataBitsIndex] << 1;
+		}
+		else {
+			dataBits[dataBitsIndex] = (dataBits[dataBitsIndex] << 1) | 1;
+		}
+
+		if (i % 8 == 0) {
+			dataBitsIndex++;
+		}
+	}
+
+	digitalWrite(dhtPin, HIGH);
+
+	// Calculate values obtained from communication
+	float temp = dataBits[0] + dataBits[1]/100;
+	float humid = dataBits[2] + dataBits[3]/100;
+
+	int checkSum = dataBits[0] + dataBits[1] + dataBits[2] + dataBits[3];
+	if ((checkSum & 0b11111111) != dataBits[4]) {
+		printDec("CHECKSUM ERROR: Checksum obtained: ", checkSum & 0b11111111);
+		printDec("CHECKSUM ERROR: Checksum expected: ", dataBits[4]);
+	}
+	// ELSE
+
+	printFloat("*DHT11* Temperature value: ", temp);
+	printFloat("*DHT11* Humidity value: ", humid);
 	
 }
 
