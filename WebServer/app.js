@@ -8,6 +8,7 @@ const port = 3000;
 // CURRENT VALUES 
 var currentWindSpeed = undefined
 var currentTemperature = undefined
+var currentPressure = undefined
 
 // Html content with most recent values
 function newHtmlContent() {
@@ -22,6 +23,7 @@ function newHtmlContent() {
     <body>
         <h1>Wind speed: ${currentWindSpeed}</h1>
         <h1>Temperature: ${currentTemperature}</h1>
+        <h1>Pressure: ${currentPressure}</h1>
     </body>
 
     </html>
@@ -46,6 +48,7 @@ app.post('/', (req, res) => {
 	var jsonData = req.body
 	currentWindSpeed = jsonData.windSpeed
 	currentTemperature = jsonData.temperature
+	currentPressure = jsonData.pressure
 
   	console.log("Received POST:", jsonData)
   	renderPage(res)
