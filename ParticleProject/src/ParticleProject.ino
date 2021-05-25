@@ -152,14 +152,7 @@ int getScaleFact(int reg) {
 	return scale_fact;
 }
 
-void loop() {
-
-	// Light sensor
-	//int result = analogRead(lightSensor);
-	//Serial.printlnf("Light sensor: %d mV", result);
-
-
-
+void getValuesBarometer() {
 	// Set continuous reading for barometer and temperature
 	Wire.beginTransmission(bht_sensor); // 0x77 -> addresse de barometer
 	int meas_cfg = 0x08;
@@ -226,6 +219,21 @@ void loop() {
 
 	printDec("Final pressure p_comp: ", p_comp);
 	printDec("Final temperature t_comp: ", t_comp);
+}
+
+void getValuesHumidity() {
+	
+}
+
+void loop() {
+
+	// Light sensor
+	//int result = analogRead(lightSensor);
+	//Serial.printlnf("Light sensor: %d mV", result);
+
+
+	//getValuesBarometer();
+	getValuesHumidity();
 
 	
 	delay(1000);
