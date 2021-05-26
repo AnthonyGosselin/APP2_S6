@@ -92,39 +92,32 @@ void loop() {
 }*/
 
 #include <math.h>
-#include <../lib/google-maps-device-locator/src/google-maps-device-locator.h>
 
-TCPClient client;
-byte server[] = { 192, 168, 1, 6 };
-int server_port = 3000;
-
+// Argon pins
+uint8_t bht_sensor = 0x77;
 const int lightSensor = A0;
 const int humidSensor = D2;
 const int windSensor = A2;
 const int windSpeedSensor = A3;
 const int rainSensor = D4;
 
+// Global variables (to send to json)
+
+
+// Global time counters 
 int lastWindSpeedEventTime = 0;
 int lastRainEventTime = 0;
 
-uint8_t bht_sensor = 0x77;
-
-// Current values (used to transmit)
-float windSpeedCurrentValue = 0;
-float windDirectionCurrentValue = 0;
-float temperatureCurrentValue = 0;
-float pressureCurrentValue = 0;
-float humidityCurrentValue = 0;
-float rainCurrentValue = 0;
-float luminosityCurrentValue = 0;
-
-String geolocationCurrentValue = "no location";
-
-GoogleMapsDeviceLocator locator;
-float _latitude;
-float _longitude;
-float _accuracy;
-
+// Barometer coefficients
+int32_t c0;
+int32_t c1;
+int32_t c00;
+int32_t c01;
+int32_t c11;
+int32_t c10;
+int32_t c20;
+int32_t c21;
+int32_t c30;
 
 // Oversampling rate and scale factors
 int scale_factors[8] = {524288, 1572864, 3670016, 7864320, 253952, 516096, 1040384, 2088960};
@@ -138,11 +131,12 @@ void setup() {
 	attachInterrupt(rainSensor, rainEvent, RISING);
 
 	Wire.begin();
+	getBarometerSetup();
 
 	Serial.print("Setup complete.");
 }
 
-void readData(int device_addr, int reg, int num_bytes, uint8_t registerValues[]) {
+void readData(int device_addr, int reg, int num_bytes, uint8_t *registerValues) {
 	Wire.beginTransmission(device_addr);
 	Wire.write(reg);
 	Wire.endTransmission();
@@ -167,19 +161,15 @@ void printDec(char* text, int value) {
 
 void printFloat(char* text, float value) {
 	Serial.print(text);
-	Serial.print(value);
+	Serial.printf("%.4f", value);
 	Serial.println();
 }
 
-int comp2(uint32_t binary_input, int num_bit) {
-
-	// Check if negative number
-	int binary_output;
-	if (binary_input > (pow(2, num_bit - 1) - 1)) {
-		binary_output = binary_input - pow(2, num_bit);
+void comp2(int32_t *binary_input, int length)
+{
+	if (*binary_input > (pow(2, length - 1) - 1)) {
+		*binary_input -= pow(2, length);
 	}
-
-	return binary_output;
 }
 
 int getScaleFact(int reg) {
@@ -191,73 +181,100 @@ int getScaleFact(int reg) {
 	return scale_fact;
 }
 
-void getValuesBarometer() {
+void getBarometerSetup() {
+
+	// Set pressure config
+	Wire.beginTransmission(bht_sensor); // 0x77 -> addresse de barometer
+	int temp_cfg = 0x06;
+	Wire.write(temp_cfg);
+	Wire.write(0b00000011);
+	Wire.endTransmission();
+
+	// Set temp config
+	uint8_t temp_coeff_src[1];
+	readData(bht_sensor, 0x28, 1, temp_coeff_src);
+	uint8_t temp_config = (temp_coeff_src[0] & 0b10000000) | 0b00000011;
+
+	Wire.beginTransmission(bht_sensor); // 0x77 -> addresse de barometer
+	int prs_cfg = 0x07;
+	Wire.write(prs_cfg);
+	Wire.write(temp_config);
+	Wire.endTransmission();
+
 	// Set continuous reading for barometer and temperature
 	Wire.beginTransmission(bht_sensor); // 0x77 -> addresse de barometer
 	int meas_cfg = 0x08;
 	Wire.write(meas_cfg);
-	Wire.write(7);
+	Wire.write(0b00000111);
 	Wire.endTransmission();
+
 
 	// Read calibration coefficients
 	uint8_t calib_coeffs[18];
 	readData(bht_sensor, 0x10, 18, calib_coeffs);
 
-	int c0 = comp2((((uint32_t)calib_coeffs[0] << 4) | ((uint32_t)calib_coeffs[1] >> 4)) & 0x0F, 12);
-	int c1 = comp2((((uint32_t)calib_coeffs[1] & 0x0F) << 8) | (uint32_t)calib_coeffs[2], 12);
-	int c00 = comp2((((uint32_t)calib_coeffs[3] << 12) | ((uint32_t)calib_coeffs[4] << 4) | ((uint32_t)calib_coeffs[5] >> 4)) & 0x0F, 20);
-	int c10 = comp2(((uint32_t)calib_coeffs[5] & 0x0F) << 16 | (uint32_t)calib_coeffs[6] << 8 | (uint32_t)calib_coeffs[7], 20);
-	int c01 = comp2((uint32_t)calib_coeffs[8] << 8 | (uint32_t)calib_coeffs[9], 16);
-	int c11 = comp2((uint32_t)calib_coeffs[10] << 8 | (uint32_t)calib_coeffs[11], 16);
-	int c20 = comp2((uint32_t)calib_coeffs[12] << 8 | (uint32_t)calib_coeffs[13], 16);
-	int c21 = comp2((uint32_t)calib_coeffs[14] << 8 | (uint32_t)calib_coeffs[15], 16);
-	int c30 = comp2((uint32_t)calib_coeffs[16] << 8 | (uint32_t)calib_coeffs[17], 16);
+	c0 = ((uint32_t)calib_coeffs[0] << 4) | (((uint32_t)calib_coeffs[1] >> 4) & 0x0F);
+	comp2(&c0, 12);
+	c1 = (((uint32_t)calib_coeffs[1] & 0x0F) << 8) | (uint32_t)calib_coeffs[2];
+	comp2(&c1, 12);
+
+	c00 = (((uint32_t)calib_coeffs[3] << 12) | ((uint32_t)calib_coeffs[4] << 4) | (((uint32_t)calib_coeffs[5] >> 4)) & 0x0F);
+	comp2(&c00, 20);
+	c10 = ((uint32_t)calib_coeffs[5] & 0x0F) << 16 | (uint32_t)calib_coeffs[6] << 8 | (uint32_t)calib_coeffs[7];
+	comp2(&c10, 20);
+	c01 = (uint32_t)calib_coeffs[8] << 8 | (uint32_t)calib_coeffs[9];
+	comp2(&c01, 16);
+	c11 = (uint32_t)calib_coeffs[10] << 8 | (uint32_t)calib_coeffs[11];
+	comp2(&c11, 16);
+	c20 = (uint32_t)calib_coeffs[12] << 8 | (uint32_t)calib_coeffs[13];
+	comp2(&c20, 16);
+	c21 = (uint32_t)calib_coeffs[14] << 8 | (uint32_t)calib_coeffs[15];
+	comp2(&c21, 16);
+	c30 = (uint32_t)calib_coeffs[16] << 8 | (uint32_t)calib_coeffs[17];
+	comp2(&c30, 16);
 
 	Serial.printlnf("Coeff: %d, %d, %d, %d, %d, %d, %d, %d, %d", c0, c1, c00, c10, c01, c11, c20, c21, c30);
+}
+
+void getValuesBarometer() {
 
 	// Read barometer
 	int psr_b2 = 0x00;
 	uint8_t barometerValues[3];
 	readData(bht_sensor, psr_b2, 3, barometerValues);
 
-	uint32_t pressureValue = barometerValues[0];
-	pressureValue = (pressureValue << 8) | barometerValues[1];
-	pressureValue = (pressureValue << 8) | barometerValues[2];
+	uint32_t pressureValue = (barometerValues[0] << 16) | (barometerValues[1] << 8) | barometerValues[2];
 
-	printBin("Pressure: ", pressureValue);
-
-	int pressureValueSigned = comp2(pressureValue, 24);
-	printDec("Pressure dec: ", pressureValueSigned);
+	int32_t pressureSigned = pressureValue;
+	comp2(&pressureSigned, 24);
 
 	int barometer_scale_fact = getScaleFact(0x06);
-	printDec("Scale factor barometer: ", barometer_scale_fact);
-	int p_raw_sc = pressureValueSigned / barometer_scale_fact;
+	float pressureSignedF = pressureSigned;
+	pressureSignedF /= barometer_scale_fact;
+
 
 	// Read temperature
 	int tmp_b2 = 0x03;
 	uint8_t temperature_values[3];
 	readData(bht_sensor, tmp_b2, 3, temperature_values);
 
-	uint32_t temperature_value = temperature_values[0];
-	temperature_value = (temperature_value << 8) | temperature_values[1];
-	temperature_value = (temperature_value << 8) | temperature_values[2];
+	uint32_t temperature_value = (temperature_values[0] << 16) | (temperature_values[1] << 8) | temperature_values[2];
 
-	printBin("Temperature: ", temperature_value);
-
-	int temperature_value_signed = comp2(temperature_value, 24);
-	printDec("Temperature dec: ", temperature_value_signed);
+	int32_t tempSigned = temperature_value;
+	comp2(&tempSigned, 24);
 
 	int temperature_scale_fact = getScaleFact(0x07);
-	printDec("Scale factor temp: ", temperature_scale_fact);
-	int t_raw_sc = temperature_value_signed / temperature_scale_fact;
+	float tempSignedF = tempSigned;
+	tempSignedF /= (float)temperature_scale_fact;
 
 
-	// Compute final pressure value
-	int p_comp = c00 + p_raw_sc * (c10 + p_raw_sc * (c20 + p_raw_sc * c30)) + t_raw_sc * (c01 + p_raw_sc * (c11 + p_raw_sc * c21));
-	int t_comp = c0*0.5 + c1*t_raw_sc;
+	// Compute final compensated values
+	float p_comp = c00 + pressureSignedF * (c10 + pressureSignedF * (c20 + pressureSignedF * c30)) + tempSignedF * (c01 + pressureSignedF * (c11 + pressureSignedF * c21));
+	float t_comp = c0*0.5 + c1*tempSignedF;
 
-	printDec("Final pressure p_comp: ", p_comp);
-	printDec("Final temperature t_comp: ", t_comp);
+	float p_comp_kPa = p_comp / 1000.0;
+	printFloat("Final pressure p_comp (kPa): ", p_comp_kPa);
+	printFloat("Final temperature t_comp: ", t_comp);
 }
 
 void getValuesHumidity() {
@@ -381,61 +398,17 @@ void rainEvent() {
 	lastRainEventTime = current_millis;
 }
 
-void sendPost() {
-
-	// Connect to server
-	if(!client.connect(server, server_port)) {
-		Serial.println("Server connection failed.");
-		return;
-	}
-
-	Serial.println("New connection: creating POST");
-
-	// TODO: Get geolocation
-
-	String postVal = ""
-	"{" 
-	"\"windSpeed\": " + String(windSpeedCurrentValue) + ","
-	"\"windDirection\": " + String(windDirectionCurrentValue) + ","
-	"\"temperature\": " + String(temperatureCurrentValue) + ","
-	"\"pressure\": " + String(pressureCurrentValue) + ","
-	"\"humidity\": " + String(humidityCurrentValue) + ","
-	"\"rain\": " + String(rainCurrentValue) + ","
-	"\"luminosity\": " + String(luminosityCurrentValue) + ","
-
-	"\"location\": " + geolocationCurrentValue + ","
-	"}";
-
-	String ip_str = "";
-	for (int i = 0; i < 4; i++) {
-		ip_str += (char*)server[i];
-		if (i < 3) {
-			ip_str += ".";
-		}
-	}
-	String port_str = String(server_port);
-	
-	// Send our HTTP data!
-	client.println("POST / HTTP/1.0");
-	client.println("Host: " + ip_str + ":" + port_str);
-	client.println("Content-Type: application/json");
-	client.print("Content-Length: ");
-	client.println(strlen(postVal));
-	client.println();
-	client.print(postVal);
-
-	// Stop the current connection
-	client.stop();
+void getValuesLight() {
+	int result = analogRead(lightSensor);
+	Serial.printlnf("Light sensor: %d mV", result);
 }
 
 
 void loop() {
 
-	// Light sensor
-	//int result = analogRead(lightSensor);
-	//Serial.printlnf("Light sensor: %d mV", result);
-
 	delay(1000);
+
+	// getValuesLight();
 
 	getValuesBarometer();
 	
