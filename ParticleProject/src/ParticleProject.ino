@@ -1,97 +1,20 @@
-//#include <../lib/google-maps-device-locator/src/google-maps-device-locator.h>
+#include <../lib/google-maps-device-locator/src/google-maps-device-locator.h>
+#include <math.h>
 
-/*TCPClient client;
+//SYSTEM_MODE(SEMI_AUTOMATIC);
+
+// Server variables
+TCPClient client;
 byte server[] = { 192, 168, 0, 106 };
+String ip = "192.168.0.106";
 //byte server[] = { 192, 168, 1, 6 };
+int server_port = 3000;
 
+// Google maps variables
+GoogleMapsDeviceLocator locator;
 float _latitude;
 float _longitude;
 float _accuracy;
-
-GoogleMapsDeviceLocator locator;
-
-int i = 0;
-
-// setup() runs once, when the device is first turned on.
-void setup() {
-  Serial.begin(9600);
-  // Put initialization like pinMode and begin functions here.
-
-  waitFor(Serial.isConnected, 30000);
-  Serial.println("Started");
-  locator.withSubscribe(locationCallback).withLocatePeriodic(30);
-}
-
-void locationCallback(float lat, float lon, float accuracy) {
-  // Handle the returned location data for the device. This method is passed three arguments:
-  _latitude = lat;
-  _longitude = lon;
-  _accuracy = accuracy;
-
-  Serial.println("Google Maps:");
-  Serial.print("Latitude: ");
-  Serial.println(_latitude);
-  Serial.print("Longitude: ");
-  Serial.println(_longitude);
-  Serial.print("Accuracy: ");
-  Serial.println(_accuracy);
-}
-
-
-// loop() runs over and over again, as quickly as it can execute.
-void loop() {
-  // The core of your code will likely live here.
-  //Serial.printlnf("Counting: %d", i++);
-  delay(1000);
-
-  locator.loop();
-
-  // POST Message
-  if(client.connect(server, 3000))
-  {
-    // Print some information that we have connected to the server
-    Serial.println("**********************************!");
-    Serial.printlnf("New POST Connection!: %d", i);
-    Serial.println("Connection OK!");
-
-    char* postVal = ""
-    "{"
-      "\"windSpeed\": 420,"
-      "\"temperature\": 23"
-    "}";
-            
-    // Send our HTTP data!
-    client.println("POST / HTTP/1.0");
-    client.println("Host: 192.168.1.6:3000"); // ************ HARDCODED HOST IP??
-    client.println("Content-Type: application/json");
-    client.print("Content-Length: ");
-    client.println(strlen(postVal));
-    client.println();
-    client.print(postVal);
-
-    // Read data from the buffer
-    
-    // while(receivedData.indexOf("\r\n\r\n") == -1)
-    // {
-    //     memset(dataBuffer, 0x00, sizeof(dataBuffer));
-    //     client.read(dataBuffer, sizeof(dataBuffer));
-    //     receivedData += (const char*)dataBuffer;
-    // }
-    
-    // Print the string
-    //Serial.println(receivedData);
-
-    // Stop the current connection
-    client.stop();
-  }  
-  else
-  {
-      Serial.println("Server connection failed. Trying again...");
-  } 
-
-}*/
-
-#include <math.h>
 
 // Argon pins
 uint8_t bht_sensor = 0x77;
@@ -101,8 +24,18 @@ const int windSensor = A2;
 const int windSpeedSensor = A3;
 const int rainSensor = D4;
 
-// Global variables (to send to json)
+// Current values (used to transmit)
+float windSpeedCurrentValue = 0;
+float windDirectionCurrentValue = 0;
+float temperatureCurrentValue = 0;
+float temperatureDecimalCurrentValue = 0;
+float pressureCurrentValue = 0;
+float humidityCurrentValue = 0;
+float humidityDecimalCurrentValue = 0;
+float rainCurrentValue = 0;
+float luminosityCurrentValue = 0;
 
+String geolocationCurrentValue = "no location";
 
 // Global time counters 
 int lastWindSpeedEventTime = 0;
@@ -119,10 +52,22 @@ int32_t c20;
 int32_t c21;
 int32_t c30;
 
+// Wifi connection timer
+bool locationAcquiered = false;
+time_t lastWifiPostTime = 0;
+
 // Oversampling rate and scale factors
 int scale_factors[8] = {524288, 1572864, 3670016, 7864320, 253952, 516096, 1040384, 2088960};
 
 void setup() {
+	WiFi.on();
+	Particle.connect();
+	Serial.begin(9600);
+
+	waitFor(Serial.isConnected, 30000);
+	locator.withSubscribe(locationCallback).withLocateOnce();
+	// locator.withSubscribe(locationCallback).withLocatePeriodic(30);
+
 	pinMode(lightSensor, OUTPUT);
 	pinMode(humidSensor, OUTPUT);
 	digitalWrite(humidSensor, HIGH); // DHT11 starts high
@@ -133,8 +78,61 @@ void setup() {
 	Wire.begin();
 	getBarometerSetup();
 
-	Serial.print("Setup complete.");
+	Serial.println("Setup complete.");
 }
+
+void locationCallback(float lat, float lon, float accuracy) {
+
+	locationAcquiered = true;
+	_latitude = lat;
+	_longitude = lon;
+	_accuracy = accuracy;
+}
+
+void sendPost() {
+
+	// Connect to server
+	if(!client.connect(server, server_port)) {
+		Serial.println("Server connection failed.");
+		return;
+	}
+
+	Serial.println("New connection: creating POST");
+
+	// Get geolocation
+	geolocationCurrentValue = String(_latitude) + ", " + String(_longitude) + ", " + String(_accuracy);
+
+	String postVal = ""
+	"{" 
+	"\"windSpeed\": " + String(windSpeedCurrentValue) + ","
+	"\"windDirection\": " + String(windDirectionCurrentValue) + ","
+	"\"temperature\": " + String(temperatureCurrentValue) + ","
+	"\"temperatureDecimal\": " + String(temperatureDecimalCurrentValue) + ","
+	"\"pressure\": " + String(pressureCurrentValue) + ","
+	"\"humidity\": " + String(humidityCurrentValue) + ","
+	"\"humidityDecimal\": " + String(humidityDecimalCurrentValue) + ","
+	"\"rain\": " + String(rainCurrentValue) + ","
+	"\"luminosity\": " + String(luminosityCurrentValue) + ","
+	"\"location\": \"" + geolocationCurrentValue + "\""
+	"}";
+
+	String port_str = String(server_port);
+	
+	// Send our HTTP data!
+	client.println("POST / HTTP/1.0");
+	client.println("Host: " + ip + ":" + port_str);
+	client.println("Content-Type: application/json");
+	client.print("Content-Length: ");
+	client.println(strlen(postVal));
+	client.println();
+	client.print(postVal);
+
+	// Stop the current connection
+	client.stop();
+
+	Serial.println("Post function done");
+}
+
 
 void readData(int device_addr, int reg, int num_bytes, uint8_t *registerValues) {
 	Wire.beginTransmission(device_addr);
@@ -233,7 +231,7 @@ void getBarometerSetup() {
 	c30 = (uint32_t)calib_coeffs[16] << 8 | (uint32_t)calib_coeffs[17];
 	comp2(&c30, 16);
 
-	Serial.printlnf("Coeff: %d, %d, %d, %d, %d, %d, %d, %d, %d", c0, c1, c00, c10, c01, c11, c20, c21, c30);
+	//Serial.printlnf("Coeff: %d, %d, %d, %d, %d, %d, %d, %d, %d", c0, c1, c00, c10, c01, c11, c20, c21, c30);
 }
 
 void getValuesBarometer() {
@@ -273,13 +271,13 @@ void getValuesBarometer() {
 	float t_comp = c0*0.5 + c1*tempSignedF;
 
 	float p_comp_kPa = p_comp / 1000.0;
-	printFloat("Final pressure p_comp (kPa): ", p_comp_kPa);
-	printFloat("Final temperature t_comp: ", t_comp);
+	// printFloat("Final pressure p_comp (kPa): ", p_comp_kPa);
+	// printFloat("Final temperature t_comp: ", t_comp);
+
+	pressureCurrentValue = p_comp_kPa;
 }
 
 void getValuesHumidity() {
-
-	Serial.println("start");
 	int dhtPin = humidSensor;
 
 	noInterrupts();
@@ -287,10 +285,8 @@ void getValuesHumidity() {
 	delay(250);
 
 	// Start signal
-	Serial.println("low");
 	digitalWrite(dhtPin, LOW);
 	delay(20);
-	Serial.println("high");
 	digitalWrite(dhtPin, HIGH);
 	delayMicroseconds(40);
 	pinMode(humidSensor, INPUT);
@@ -303,12 +299,6 @@ void getValuesHumidity() {
 		pulseTimes[i] = pulseIn(dhtPin, HIGH); // Do not execute anything in loop (will throw off timing)
 	}
 	interrupts();
-
-	// Print delays
-	// for (int i = 0; i < 40; i++) {
-	// 	printf("%d", i);
-	// 	printDec(" Delay time: ", delayArrayForPrint[i]);
-	// }
 
 	pinMode(humidSensor, OUTPUT);
 	digitalWrite(dhtPin, LOW);
@@ -324,19 +314,28 @@ void getValuesHumidity() {
 	}
 
 	// Calculate values obtained from communication
-	float humid = dataBits[0]; // + dataBits[1]/100;
-	float temp = dataBits[2]; // + dataBits[3]/100;
+	int humid = dataBits[0];
+	int humidDecimal = dataBits[1];
+	int temp = dataBits[2];
+	int tempDecimal = dataBits[3];
 
 	int checkSum = dataBits[0] + dataBits[1] + dataBits[2] + dataBits[3];
 	if ((checkSum & 0b11111111) != dataBits[4]) {
-		printDec("CHECKSUM ERROR: Checksum obtained: ", checkSum & 0b11111111);
-		printDec("CHECKSUM ERROR: Checksum expected: ", dataBits[4]);
+		// printDec("CHECKSUM ERROR: Checksum obtained: ", checkSum & 0b11111111);
+		// printDec("CHECKSUM ERROR: Checksum expected: ", dataBits[4]);
+		Serial.println("CHECKSUM ERROR");
 	}
-	// ELSE
-
-	printFloat("*DHT11* Temperature value: ", temp);
-	printFloat("*DHT11* Humidity value: ", humid);
+	else {
+		humidityCurrentValue = humid;
+		humidityDecimalCurrentValue = humidDecimal;
+		temperatureCurrentValue = temp;
+		temperatureDecimalCurrentValue = tempDecimal;
 	
+	}
+
+	// printFloat("*DHT11* Temperature value: ", temp);
+	// printFloat("*DHT11* Humidity value: ", humid);
+
 }
 
 void getValuesWindDirection() {
@@ -359,10 +358,10 @@ void getValuesWindDirection() {
 	float direction_array[16] = {0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5, 180, 202.5, 225, 247.5, 270, 292.5, 315, 337.5};
 	float direction_deg = direction_array[closest_ind];
 
-	printDec("Voltage read: ", voltage_read);
-	printDec("smallest delta: ", smallest_delta);
-	printDec("closest ind: ", closest_ind);
-	printFloat("Final direction: ", direction_deg);
+	// printDec("Voltage read: ", voltage_read);
+	// printFloat("Final direction: ", direction_deg);
+
+	windDirectionCurrentValue = direction_deg;
 }
 
 void windSpeedEvent() {
@@ -376,11 +375,13 @@ void windSpeedEvent() {
 			return;
 		}
 
-		printDec("Wind speed new delta: ", time_since_last_event);
+		//printDec("Wind speed new delta: ", time_since_last_event);
 
 		// 2.4 km/h / s
 		float wind_speed = (1000.0 / (float)time_since_last_event) * 2.4;
 		printFloat("Current wind speed: ", wind_speed);
+
+		windSpeedCurrentValue = wind_speed;
 	}
 	lastWindSpeedEventTime = current_millis;
 }
@@ -393,14 +394,34 @@ void rainEvent() {
 	int time_since_last_event = current_millis - lastRainEventTime;
 	if (time_since_last_event > 600) {
 		printDec("Time since last rain event: ", time_since_last_event);
+
+		lastRainEventTime = current_millis;
 	}
 
-	lastRainEventTime = current_millis;
 }
 
 void getValuesLight() {
 	int result = analogRead(lightSensor);
-	Serial.printlnf("Light sensor: %d mV", result);
+	//Serial.printlnf("Light sensor: %d mV", result);
+}
+
+void sendData(){
+
+	// WiFi.on();
+	// WiFi.connect();
+	// Particle.connect();
+	// Serial.println("WiFi on");
+
+	// while (!WiFi.ready()){
+	// 	delay(100);
+	// }
+	sendPost();
+	//delay(10000);
+
+	// Particle.disconnect();
+	// WiFi.disconnect();
+	// WiFi.off();
+	// Serial.println("WiFi off");
 }
 
 
@@ -408,12 +429,20 @@ void loop() {
 
 	delay(1000);
 
-	// getValuesLight();
-
+	getValuesLight();
 	getValuesBarometer();
+	getValuesHumidity();
+	getValuesWindDirection();
+
+	time_t currentTime = Time.now();
+	if (locationAcquiered){
+		if (currentTime - lastWifiPostTime > 10) {
+			sendData();
+			lastWifiPostTime = currentTime;
+		}
+	}
+	else {
+		locator.loop();
+	}
 	
-	//getValuesHumidity();
-
-	//getValuesWindDirection();
-
 }

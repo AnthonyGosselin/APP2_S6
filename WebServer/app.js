@@ -9,8 +9,10 @@ const port = 3000;
 var currentWindSpeed = undefined
 var currentWindDirection = undefined
 var currentTemperature = undefined
+var currentTemperatureDecimal = undefined
 var currentPressure = undefined
 var currentHumidity = undefined
+var currentHumidityDecimal = undefined
 var currentRain = undefined
 var currentLuminosity = undefined
 
@@ -27,13 +29,15 @@ function newHtmlContent() {
     <body>
 		<h1 style="color:blue">Weather Station</h1>
 		<br>
-        <h2>Wind speed: ${currentWindSpeed}</h2>
-        <h2>Wind direction: ${currentWindDirection}</h2>
-        <h2>Temperature: ${currentTemperature}</h2>
-        <h2>Pressure: ${currentPressure}</h2>
-        <h2>Humidity: ${currentHumidity}</h2>
-        <h2>Rain: ${currentRain}</h2>
-        <h2>Luminosity: ${currentLuminosity}</h2>
+			<h2>Wind speed: ${currentWindSpeed}</h2>
+			<h2>Wind direction: ${currentWindDirection}</h2>
+			<h2>Temperature: ${currentTemperature}</h2>
+			<h2>Temperature decimal: ${currentTemperatureDecimal}</h2>
+			<h2>Pressure: ${currentPressure}</h2>
+			<h2>Humidity: ${currentHumidity}</h2>
+			<h2>Humidity decimal: ${currentHumidityDecimal}</h2>
+			<h2>Rain: ${currentRain}</h2>
+			<h2>Luminosity: ${currentLuminosity}</h2>
     </body>
 
     </html>
@@ -59,8 +63,10 @@ app.post('/', (req, res) => {
 	currentWindSpeed = jsonData.windSpeed
 	currentWindDirection = jsonData.windDirection
 	currentTemperature = jsonData.temperature
+	currentTemperatureDecimal = jsonData.temperatureDecimal
 	currentPressure = jsonData.pressure
 	currentHumidity = jsonData.humidity
+	currentHumidityDecimal = jsonData.humidityDecimal
 	currentRain = jsonData.rain
 	currentLuminosity = jsonData.luminosity
 
