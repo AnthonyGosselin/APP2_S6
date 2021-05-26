@@ -181,10 +181,10 @@ void getValuesBarometer() {
 	uint8_t calib_coeffs[18];
 	readData(bht_sensor, 0x10, 18, calib_coeffs);
 
-	int c0 = comp2(((uint32_t)calib_coeffs[0] << 4) | ((uint32_t)calib_coeffs[1] >> 4), 12);
-	int c1 = comp2((((uint32_t)calib_coeffs[1] & 0b00001111) << 8) | (uint32_t)calib_coeffs[2], 12);
-	int c00 = comp2(((uint32_t)calib_coeffs[3] << 12) | ((uint32_t)calib_coeffs[4] << 4) | ((uint32_t)calib_coeffs[5] >> 4), 20);
-	int c10 = comp2(((uint32_t)calib_coeffs[5] & 0b00001111) << 16 | (uint32_t)calib_coeffs[6] << 8 | (uint32_t)calib_coeffs[7], 20);
+	int c0 = comp2((((uint32_t)calib_coeffs[0] << 4) | ((uint32_t)calib_coeffs[1] >> 4)) & 0x0F, 12);
+	int c1 = comp2((((uint32_t)calib_coeffs[1] & 0x0F) << 8) | (uint32_t)calib_coeffs[2], 12);
+	int c00 = comp2((((uint32_t)calib_coeffs[3] << 12) | ((uint32_t)calib_coeffs[4] << 4) | ((uint32_t)calib_coeffs[5] >> 4)) & 0x0F, 20);
+	int c10 = comp2(((uint32_t)calib_coeffs[5] & 0x0F) << 16 | (uint32_t)calib_coeffs[6] << 8 | (uint32_t)calib_coeffs[7], 20);
 	int c01 = comp2((uint32_t)calib_coeffs[8] << 8 | (uint32_t)calib_coeffs[9], 16);
 	int c11 = comp2((uint32_t)calib_coeffs[10] << 8 | (uint32_t)calib_coeffs[11], 16);
 	int c20 = comp2((uint32_t)calib_coeffs[12] << 8 | (uint32_t)calib_coeffs[13], 16);
@@ -231,7 +231,7 @@ void getValuesBarometer() {
 
 
 	// Compute final pressure value
-	int p_comp = c00 + p_raw_sc * (c10 + p_raw_sc * (c20 + p_raw_sc * c30)) + t_raw_sc * c01 + t_raw_sc * p_raw_sc * (c11 + p_raw_sc * c21);
+	int p_comp = c00 + p_raw_sc * (c10 + p_raw_sc * (c20 + p_raw_sc * c30)) + t_raw_sc * (c01 + p_raw_sc * (c11 + p_raw_sc * c21));
 	int t_comp = c0*0.5 + c1*t_raw_sc;
 
 	printDec("Final pressure p_comp: ", p_comp);
