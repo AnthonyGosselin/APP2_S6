@@ -323,7 +323,7 @@ void getValuesHumidity() {
 	if ((checkSum & 0b11111111) != dataBits[4]) {
 		// printDec("CHECKSUM ERROR: Checksum obtained: ", checkSum & 0b11111111);
 		// printDec("CHECKSUM ERROR: Checksum expected: ", dataBits[4]);
-		Serial.println("CHECKSUM ERROR");
+		Serial.println("CHECKSUM ERROR: humidity sensor");
 	}
 	else {
 		humidityCurrentValue = humid;
@@ -387,7 +387,6 @@ void windSpeedEvent() {
 }
 
 void rainEvent() {
-	// One event every 0.2794 mm
 	int current_millis = millis();
 
 	// Ignore bounce
@@ -395,6 +394,8 @@ void rainEvent() {
 	if (time_since_last_event > 600) {
 		printDec("Time since last rain event: ", time_since_last_event);
 
+		rainCurrentValue += 0.2794; // Every event is equivalent to 0.2794 mm
+		
 		lastRainEventTime = current_millis;
 	}
 

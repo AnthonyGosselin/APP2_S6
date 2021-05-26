@@ -29,13 +29,13 @@ function newHtmlContent() {
     <body>
 		<h1 style="color:blue">Weather Station</h1>
 		<br>
-			<h2>Wind speed: ${currentWindSpeed}</h2>
-			<h2>Wind direction: ${currentWindDirection}</h2>
-			<h2>Temperature: ${currentTemperature}.${currentTemperatureDecimal}</h2>
-			<h2>Pressure: ${currentPressure}</h2>
-			<h2>Humidity: ${currentHumidity}.${currentHumidityDecimal}</h2>
-			<h2>Rain: ${currentRain}</h2>
-			<h2>Luminosity: ${currentLuminosity}</h2>
+			<h2>Wind speed: ${currentWindSpeed} km/h</h2>
+			<h2>Wind direction: ${currentWindDirection} deg</h2>
+			<h2>Temperature: ${currentTemperature}.${currentTemperatureDecimal} C</h2>
+			<h2>Pressure: ${currentPressure} kPa</h2>
+			<h2>Humidity: ${currentHumidity}.${currentHumidityDecimal} %</h2>
+			<h2>Rain: ${currentRain} mm</h2>
+			<h2>Luminosity: ${currentLuminosity} lx?</h2>
     </body>
 
     </html>
