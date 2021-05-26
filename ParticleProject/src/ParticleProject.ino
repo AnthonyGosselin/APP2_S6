@@ -230,14 +230,6 @@ void getValuesBarometer() {
 	printDec("Final temperature t_comp: ", t_comp);
 }
 
-// float addDecimals(int integral, int decimal, int decimalPlaces) {
-// 	float intToFloat = integral;
-// 	for (int i = 1; i < decimalPlaces+1; i++) {
-// 		int decimalPosition = decimal % pow(10, i);
-// 		intToFloat += pow(decimalPosition, -i);
-// 	}
-// }
-
 void getValuesHumidity() {
 
 	Serial.println("start");
@@ -259,33 +251,13 @@ void getValuesHumidity() {
 	// DHT low then high, maybe replace with a pulseIn(HIGH)
 	pulseIn(dhtPin, HIGH);
 
-	// Serial.println("pulseIn low");
-	// int dhtResponseLowTime = pulseIn(dhtPin, LOW);
-	//delayMicroseconds(100);
-	//Serial.println("pulseIn low done");
-
-	// uint8_t dataBits[5] = {0};
-	// int dataBitsIndex = 0;
-	// int delayArrayForPrint[40];
-
 	int pulseTimes[40];
 	for (int i = 0; i < 40; i++) {
-		//Serial.println("pulseIn HIGH");
-		pulseTimes[i] = pulseIn(dhtPin, HIGH);
-		//printDec("pulseIn HIGH done, duration: ", pulseTime);
-
-
-		// dataBits[dataBitsIndex] <<= 1;
-		// if (pulseTime > 50) {
-		// 	dataBits[dataBitsIndex] |= 1;
-		// }
-
-		// if (i % 8 == 0) {
-		// 	dataBitsIndex++;
-		// }
+		pulseTimes[i] = pulseIn(dhtPin, HIGH); // Do not execute anything in loop (will throw off timing)
 	}
 	interrupts();
 
+	// Print delays
 	// for (int i = 0; i < 40; i++) {
 	// 	printf("%d", i);
 	// 	printDec(" Delay time: ", delayArrayForPrint[i]);
@@ -299,14 +271,14 @@ void getValuesHumidity() {
 		for (int j = 0; j < 8; j++) {
 			dataBits[i] <<= 1;
 			if (pulseTimes[i*8 + j] > 50) {
-				dataBits[j] |= 1;
+				dataBits[i] |= 1;
 			}
 		}
 	}
 
 	// Calculate values obtained from communication
-	float temp = dataBits[0] + dataBits[1]/100;
-	float humid = dataBits[2] + dataBits[3]/100;
+	float humid = dataBits[0]; // + dataBits[1]/100;
+	float temp = dataBits[2]; // + dataBits[3]/100;
 
 	int checkSum = dataBits[0] + dataBits[1] + dataBits[2] + dataBits[3];
 	if ((checkSum & 0b11111111) != dataBits[4]) {
