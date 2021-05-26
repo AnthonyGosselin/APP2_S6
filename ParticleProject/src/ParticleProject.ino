@@ -1,4 +1,4 @@
-#include <../lib/google-maps-device-locator/src/google-maps-device-locator.h>
+//#include <../lib/google-maps-device-locator/src/google-maps-device-locator.h>
 
 /*TCPClient client;
 byte server[] = { 192, 168, 0, 106 };
@@ -94,6 +94,7 @@ void loop() {
 #include <math.h>
 
 const int lightSensor = A0;
+const int humidSensor = D2;
 
 uint8_t bht_sensor = 0x77;
 
@@ -102,6 +103,8 @@ int scale_factors[8] = {524288, 1572864, 3670016, 7864320, 253952, 516096, 10403
 
 void setup() {
 	pinMode(lightSensor, OUTPUT);
+	pinMode(humidSensor, OUTPUT);
+	digitalWrite(humidSensor, HIGH); // DHT11 starts high
 
 	Wire.begin();
 }
@@ -236,19 +239,34 @@ void getValuesBarometer() {
 // }
 
 void getValuesHumidity() {
-	int dhtPin = D4;
+
+	Serial.println("start");
+	int dhtPin = humidSensor;
+
 	// Start signal
+	Serial.println("low");
 	digitalWrite(dhtPin, LOW);
 	delay(25);
+	Serial.println("high");
 	digitalWrite(dhtPin, HIGH);
 
+	pinMode(humidSensor, INPUT);
+
+	Serial.println("pulseIn low");
 	int dhtResponseLowTime = pulseIn(dhtPin, LOW);
 	delayMicroseconds(100);
 
+	Serial.println("pulseIn low done");
+
 	uint8_t dataBits[5];
 	int dataBitsIndex = 0;
+	int delayArrayForPrint[40];
 	for (int i = 1; i < 41; i++) {
+		//Serial.println("pulseIn HIGH");
 		int pulseTime = pulseIn(dhtPin, HIGH);
+		//printDec("pulseIn HIGH done, duration: ", pulseTime);
+
+		delayArrayForPrint[i-1] = pulseTime;
 
 		if (pulseTime < 50) {
 			dataBits[dataBitsIndex] = dataBits[dataBitsIndex] << 1;
@@ -262,6 +280,12 @@ void getValuesHumidity() {
 		}
 	}
 
+	for (int i = 0; i < 40; i++) {
+		printf("%d", i);
+		printDec(" Delay time: ", delayArrayForPrint[i]);
+	}
+
+	pinMode(humidSensor, OUTPUT);
 	digitalWrite(dhtPin, HIGH);
 
 	// Calculate values obtained from communication
@@ -286,10 +310,10 @@ void loop() {
 	//int result = analogRead(lightSensor);
 	//Serial.printlnf("Light sensor: %d mV", result);
 
+	delay(1000);
 
 	//getValuesBarometer();
+	Serial.println("Loop start: calling humidity");
 	getValuesHumidity();
 
-	
-	delay(1000);
 }
