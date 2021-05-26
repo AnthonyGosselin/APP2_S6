@@ -15,6 +15,7 @@ var currentHumidity = undefined
 var currentHumidityDecimal = undefined
 var currentRain = undefined
 var currentLuminosity = undefined
+var currentLocation = undefined
 
 // Html content with most recent values
 function newHtmlContent() {
@@ -36,6 +37,9 @@ function newHtmlContent() {
 			<h2>Humidity: ${currentHumidity}.${currentHumidityDecimal} %</h2>
 			<h2>Rain: ${currentRain} mm</h2>
 			<h2>Luminosity: ${currentLuminosity} lx?</h2>
+		<br>
+			<h2>Location: ${currentLocation}</h2>
+
     </body>
 
     </html>
@@ -47,6 +51,7 @@ function renderPage(res) {
 	res.writeHead(200, {'Content-Type': 'text/html'});
 	res.write(newHtmlContent())
 	res.end()
+	initMap()
 }
 
 app.get('/', (req, res) => {
@@ -67,6 +72,7 @@ app.post('/', (req, res) => {
 	currentHumidityDecimal = jsonData.humidityDecimal
 	currentRain = jsonData.rain
 	currentLuminosity = jsonData.luminosity
+	currentLocation = jsonData.location
 
   	console.log("Received POST:", jsonData)
   	renderPage(res)
