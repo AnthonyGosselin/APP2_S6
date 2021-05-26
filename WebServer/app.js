@@ -31,11 +31,9 @@ function newHtmlContent() {
 		<br>
 			<h2>Wind speed: ${currentWindSpeed}</h2>
 			<h2>Wind direction: ${currentWindDirection}</h2>
-			<h2>Temperature: ${currentTemperature}</h2>
-			<h2>Temperature decimal: ${currentTemperatureDecimal}</h2>
+			<h2>Temperature: ${currentTemperature}.${currentTemperatureDecimal}</h2>
 			<h2>Pressure: ${currentPressure}</h2>
-			<h2>Humidity: ${currentHumidity}</h2>
-			<h2>Humidity decimal: ${currentHumidityDecimal}</h2>
+			<h2>Humidity: ${currentHumidity}.${currentHumidityDecimal}</h2>
 			<h2>Rain: ${currentRain}</h2>
 			<h2>Luminosity: ${currentLuminosity}</h2>
     </body>
