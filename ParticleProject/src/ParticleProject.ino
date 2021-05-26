@@ -95,6 +95,12 @@ void loop() {
 
 const int lightSensor = A0;
 const int humidSensor = D2;
+const int windSensor = A2;
+const int windSpeedSensor = A3;
+const int rainSensor = D4;
+
+int lastWindSpeedEventTime = 0;
+int lastRainEventTime = 0;
 
 uint8_t bht_sensor = 0x77;
 
@@ -106,7 +112,12 @@ void setup() {
 	pinMode(humidSensor, OUTPUT);
 	digitalWrite(humidSensor, HIGH); // DHT11 starts high
 
+	attachInterrupt(windSpeedSensor, windSpeedEvent, RISING);
+	attachInterrupt(rainSensor, rainEvent, RISING);
+
 	Wire.begin();
+
+	Serial.print("Setup complete.");
 }
 
 void readData(int device_addr, int reg, int num_bytes, int registerValues[]) {
@@ -141,12 +152,8 @@ void printFloat(char* text, float value) {
 int comp2(int binary_input, int num_bit) {
 
 	// Check if negative number
-	printDec("comp2 check in int: ", binary_input);
-	printDec("comp2 max: ", (pow(2, num_bit - 1) - 1));
 	if (binary_input > (pow(2, num_bit - 1) - 1)) {
 		binary_input = binary_input - pow(2, num_bit);
-		Serial.println("Comp2 limit passed");
-		printDec("New number comp2: ", binary_input);
 	}
 
 	return binary_input;
@@ -292,6 +299,66 @@ void getValuesHumidity() {
 	
 }
 
+void getValuesWindDirection() {
+	int voltage_read = analogRead(windSensor) * (5000/4096.0);
+
+	int voltage_array[16] = {3840, 1980, 2250, 410, 450, 320, 900, 620, 1400, 1190, 3080, 2930, 4620, 4040, 4330, 3430};
+
+	// Find value that is closest and save index
+	int closest_ind = 0;
+	int smallest_delta = 99999;
+	for (int i = 0; i < 16; i++) {
+		int delta = abs(voltage_array[i] - voltage_read);
+		if (delta < smallest_delta) {
+			smallest_delta = delta;
+			closest_ind = i;
+		}
+	}
+
+	// Get direction
+	float direction_array[16] = {0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5, 180, 202.5, 225, 247.5, 270, 292.5, 315, 337.5};
+	float direction_deg = direction_array[closest_ind];
+
+	printDec("Voltage read: ", voltage_read);
+	printDec("smallest delta: ", smallest_delta);
+	printDec("closest ind: ", closest_ind);
+	printFloat("Final direction: ", direction_deg);
+}
+
+void windSpeedEvent() {
+
+	int current_millis = millis();
+	if (current_millis != 0) {
+		int time_since_last_event = current_millis - lastWindSpeedEventTime;
+
+		// Ignore bounce
+		if (time_since_last_event < 20) {
+			return;
+		}
+
+		printDec("Wind speed new delta: ", time_since_last_event);
+
+		// 2.4 km/h / s
+		float wind_speed = (1000.0 / (float)time_since_last_event) * 2.4;
+		printFloat("Current wind speed: ", wind_speed);
+	}
+	lastWindSpeedEventTime = current_millis;
+}
+
+void rainEvent() {
+	// One event every 0.2794 mm
+	int current_millis = millis();
+
+	// Ignore bounce
+	int time_since_last_event = current_millis - lastRainEventTime;
+	if (time_since_last_event > 600) {
+		printDec("Time since last rain event: ", time_since_last_event);
+	}
+
+	lastRainEventTime = current_millis;
+}
+
+
 void loop() {
 
 	// Light sensor
@@ -301,7 +368,9 @@ void loop() {
 	delay(1000);
 
 	//getValuesBarometer();
-	Serial.println("Loop start: calling humidity");
-	getValuesHumidity();
+	
+	//getValuesHumidity();
+
+	//getValuesWindDirection();
 
 }
