@@ -243,50 +243,66 @@ void getValuesHumidity() {
 	Serial.println("start");
 	int dhtPin = humidSensor;
 
+	noInterrupts();
+	digitalWrite(dhtPin, HIGH);
+	delay(250);
+
 	// Start signal
 	Serial.println("low");
 	digitalWrite(dhtPin, LOW);
-	delay(25);
+	delay(20);
 	Serial.println("high");
 	digitalWrite(dhtPin, HIGH);
-
+	delayMicroseconds(40);
 	pinMode(humidSensor, INPUT);
 
-	Serial.println("pulseIn low");
-	int dhtResponseLowTime = pulseIn(dhtPin, LOW);
-	delayMicroseconds(100);
+	// DHT low then high, maybe replace with a pulseIn(HIGH)
+	pulseIn(dhtPin, HIGH);
 
-	Serial.println("pulseIn low done");
+	// Serial.println("pulseIn low");
+	// int dhtResponseLowTime = pulseIn(dhtPin, LOW);
+	//delayMicroseconds(100);
+	//Serial.println("pulseIn low done");
 
-	uint8_t dataBits[5];
-	int dataBitsIndex = 0;
-	int delayArrayForPrint[40];
-	for (int i = 1; i < 41; i++) {
+	// uint8_t dataBits[5] = {0};
+	// int dataBitsIndex = 0;
+	// int delayArrayForPrint[40];
+
+	int pulseTimes[40];
+	for (int i = 0; i < 40; i++) {
 		//Serial.println("pulseIn HIGH");
-		int pulseTime = pulseIn(dhtPin, HIGH);
+		pulseTimes[i] = pulseIn(dhtPin, HIGH);
 		//printDec("pulseIn HIGH done, duration: ", pulseTime);
 
-		delayArrayForPrint[i-1] = pulseTime;
 
-		if (pulseTime < 50) {
-			dataBits[dataBitsIndex] = dataBits[dataBitsIndex] << 1;
-		}
-		else {
-			dataBits[dataBitsIndex] = (dataBits[dataBitsIndex] << 1) | 1;
-		}
+		// dataBits[dataBitsIndex] <<= 1;
+		// if (pulseTime > 50) {
+		// 	dataBits[dataBitsIndex] |= 1;
+		// }
 
-		if (i % 8 == 0) {
-			dataBitsIndex++;
-		}
+		// if (i % 8 == 0) {
+		// 	dataBitsIndex++;
+		// }
 	}
+	interrupts();
 
-	for (int i = 0; i < 40; i++) {
-		printf("%d", i);
-		printDec(" Delay time: ", delayArrayForPrint[i]);
-	}
+	// for (int i = 0; i < 40; i++) {
+	// 	printf("%d", i);
+	// 	printDec(" Delay time: ", delayArrayForPrint[i]);
+	// }
 
 	pinMode(humidSensor, OUTPUT);
-	digitalWrite(dhtPin, HIGH);
+	digitalWrite(dhtPin, LOW);
+
+	uint8_t dataBits[5] = {0};
+	for (int i = 0; i < 5; i++) {
+		for (int j = 0; j < 8; j++) {
+			dataBits[i] <<= 1;
+			if (pulseTimes[i*8 + j] > 50) {
+				dataBits[j] |= 1;
+			}
+		}
+	}
 
 	// Calculate values obtained from communication
 	float temp = dataBits[0] + dataBits[1]/100;
