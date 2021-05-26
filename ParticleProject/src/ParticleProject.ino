@@ -92,6 +92,11 @@ void loop() {
 }*/
 
 #include <math.h>
+#include <../lib/google-maps-device-locator/src/google-maps-device-locator.h>
+
+TCPClient client;
+byte server[] = { 192, 168, 1, 6 };
+int server_port = 3000;
 
 const int lightSensor = A0;
 const int humidSensor = D2;
@@ -103,6 +108,23 @@ int lastWindSpeedEventTime = 0;
 int lastRainEventTime = 0;
 
 uint8_t bht_sensor = 0x77;
+
+// Current values (used to transmit)
+float windSpeedCurrentValue = 0;
+float windDirectionCurrentValue = 0;
+float temperatureCurrentValue = 0;
+float pressureCurrentValue = 0;
+float humidityCurrentValue = 0;
+float rainCurrentValue = 0;
+float luminosityCurrentValue = 0;
+
+String geolocationCurrentValue = "no location";
+
+GoogleMapsDeviceLocator locator;
+float _latitude;
+float _longitude;
+float _accuracy;
+
 
 // Oversampling rate and scale factors
 int scale_factors[8] = {524288, 1572864, 3670016, 7864320, 253952, 516096, 1040384, 2088960};
@@ -359,6 +381,53 @@ void rainEvent() {
 	lastRainEventTime = current_millis;
 }
 
+void sendPost() {
+
+	// Connect to server
+	if(!client.connect(server, server_port)) {
+		Serial.println("Server connection failed.");
+		return;
+	}
+
+	Serial.println("New connection: creating POST");
+
+	// TODO: Get geolocation
+
+	String postVal = ""
+	"{" 
+	"\"windSpeed\": " + String(windSpeedCurrentValue) + ","
+	"\"windDirection\": " + String(windDirectionCurrentValue) + ","
+	"\"temperature\": " + String(temperatureCurrentValue) + ","
+	"\"pressure\": " + String(pressureCurrentValue) + ","
+	"\"humidity\": " + String(humidityCurrentValue) + ","
+	"\"rain\": " + String(rainCurrentValue) + ","
+	"\"luminosity\": " + String(luminosityCurrentValue) + ","
+
+	"\"location\": " + geolocationCurrentValue + ","
+	"}";
+
+	String ip_str = "";
+	for (int i = 0; i < 4; i++) {
+		ip_str += (char*)server[i];
+		if (i < 3) {
+			ip_str += ".";
+		}
+	}
+	String port_str = String(server_port);
+	
+	// Send our HTTP data!
+	client.println("POST / HTTP/1.0");
+	client.println("Host: " + ip_str + ":" + port_str);
+	client.println("Content-Type: application/json");
+	client.print("Content-Length: ");
+	client.println(strlen(postVal));
+	client.println();
+	client.print(postVal);
+
+	// Stop the current connection
+	client.stop();
+}
+
 
 void loop() {
 
@@ -368,7 +437,7 @@ void loop() {
 
 	delay(1000);
 
-	//getValuesBarometer();
+	getValuesBarometer();
 	
 	//getValuesHumidity();
 
