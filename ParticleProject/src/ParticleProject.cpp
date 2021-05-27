@@ -1,7 +1,32 @@
+/******************************************************/
+//       THIS IS A GENERATED FILE - DO NOT EDIT       //
+/******************************************************/
+
+#include "Particle.h"
+#line 1 "c:/GitAPP/APP2_S6/ParticleProject/src/ParticleProject.ino"
 #include <../lib/google-maps-device-locator/src/google-maps-device-locator.h>
 #include <math.h>
 
 // Used for closing and opening WiFi module
+void setup();
+void locationCallback(float lat, float lon, float accuracy);
+void sendPost();
+void readData(int device_addr, int reg, int num_bytes, uint8_t *registerValues);
+void printBin(char* text, int value);
+void printDec(char* text, int value);
+void printFloat(char* text, float value);
+void comp2(int32_t *binary_input, int length);
+int getScaleFact(int reg);
+void getBarometerSetup();
+void getValuesBarometer();
+void getValuesHumidity();
+void getValuesWindDirection();
+void windSpeedEvent();
+void rainEvent();
+void getValuesLight();
+void sendData();
+void loop();
+#line 5 "c:/GitAPP/APP2_S6/ParticleProject/src/ParticleProject.ino"
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
 // Server variables
@@ -394,8 +419,6 @@ void getValuesWindDirection() {
 void windSpeedEvent() {
 
 	int current_millis = millis();
-
-	// Check if first time having a windSpeedEvent (or timer was reset)
 	if (lastWindSpeedEventTime != 0) {
 		int time_since_last_event = current_millis - lastWindSpeedEventTime;
 
@@ -415,29 +438,20 @@ void windSpeedEvent() {
 
 // Read, compute and store a reading from anemometer sensor (rainfall)
 void rainEvent() {
-
 	int current_millis = millis();
-	
-	// Check if first time having a rainEvent (or timer was reset)
-	if (lastRainEventTime != 0){
 
-		int time_since_last_event = current_millis - lastRainEventTime;
-
-		// Ignore bounce
-		if (time_since_last_event < 600) {
-			return;
-		}
-
-		// printDec("Time since last rain event: ", time_since_last_event);
+	// Ignore bounce
+	int time_since_last_event = current_millis - lastRainEventTime;
+	if (time_since_last_event > 600) {
+		printDec("Time since last rain event: ", time_since_last_event);
 
 		// Calculate rain in mm/min from last time to current time
-		float rain_rate = 0.2794 / time_since_last_event * 1000 * 60;
-
-		rainCurrentValue = rain_rate
-		// Serial.println(rainCurrentValue);
+		rainCurrentValue = 0.2794 / time_since_last_event * 1000 * 60;
+		Serial.println(rainCurrentValue);
+		
+		lastRainEventTime = current_millis;
 	}
 
-	lastRainEventTime = current_millis;
 }
 
 // Read, compute and store a reading from light sensor
@@ -475,20 +489,6 @@ void sendData(){
 	Serial.println("WiFi off");
 }
 
-void resetInterruptTimes(){
-	int currentTimeMs = millis();
-
-	// Check if rain event happened more than 1 hour ago
-	if (currentTimeMs - lastRainEventTime >  (1*1000*60*60)){
-		lastRainEventTime = 0;
-	}
-	// Check if wind event happened more than one hour ago
-	if (currentTimeMs - lastWindSpeedEventTime >  (1*1000*60*60)){
-		lastWindSpeedEventTime = 0;
-	}
-
-}
-
 // Main program loop
 void loop() {
 
@@ -500,10 +500,6 @@ void loop() {
 	getValuesBarometer();
 	getValuesHumidity();
 	getValuesWindDirection();
-
-	// Reset sensors depending on time (windSpeed, rain) if last time was very long ago
-	resetInterruptTimes();
-
 
 	// Every x seconds (10 or 60), connect to server through WiFi and send JSON data
 	time_t currentTime = Time.now();
