@@ -53,7 +53,7 @@ int32_t c21;
 int32_t c30;
 
 // Wifi connection timer
-bool locationAcquiered = false;
+bool locationAcquired = false;
 time_t lastWifiPostTime = 0;
 
 // Oversampling rate and scale factors
@@ -85,7 +85,7 @@ void setup() {
 // Function called by Google Maps integration to return location
 void locationCallback(float lat, float lon, float accuracy) {
 
-	locationAcquiered = true;
+	locationAcquired = true;
 	_latitude = lat;
 	_longitude = lon;
 	_accuracy = accuracy;
@@ -103,8 +103,9 @@ void sendPost() {
 	Serial.println("New connection: creating POST");
 
 	// Get geolocation
-	geolocationCurrentValue = String(_latitude) + ", " + String(_longitude) + ", " + String(_accuracy);
+	geolocationCurrentValue = String(_latitude) + ", " + String(_longitude) + " (" + String(_accuracy) + " m)";
 
+	// Build JSON payload
 	String postVal = ""
 	"{" 
 	"\"windSpeed\": " + String(windSpeedCurrentValue) + ","
@@ -452,7 +453,7 @@ void loop() {
 	getValuesWindDirection();
 
 	time_t currentTime = Time.now();
-	if (locationAcquiered){
+	if (locationAcquired){
 		if (currentTime - lastWifiPostTime > 10) {
 			sendData();
 			lastWifiPostTime = currentTime;
