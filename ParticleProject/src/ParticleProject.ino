@@ -1,6 +1,7 @@
 #include <../lib/google-maps-device-locator/src/google-maps-device-locator.h>
 #include <math.h>
 
+// Used for closing and opening WiFi module
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
 // Server variables
@@ -61,14 +62,18 @@ int scale_factors[8] = {524288, 1572864, 3670016, 7864320, 253952, 516096, 10403
 
 // Initial connections and setups
 void setup() {
+	// Connect WiFi and particle, since starting in semiauto mode
 	WiFi.on();
 	Particle.connect();
 	Serial.begin(9600);
+	
+	//waitFor(Serial.isConnected, 30000);
 
-	waitFor(Serial.isConnected, 30000);
+	// Subscribe callback to google maps locator
 	locator.withSubscribe(locationCallback).withLocateOnce();
 	// locator.withSubscribe(locationCallback).withLocatePeriodic(30);
 
+	// Set pin modes
 	pinMode(lightSensor, INPUT);
 	pinMode(windSensor, INPUT);
 	pinMode(windSpeedSensor, INPUT);
@@ -76,6 +81,7 @@ void setup() {
 	pinMode(humidSensor, OUTPUT);
 	digitalWrite(humidSensor, HIGH); // DHT11 starts high
 
+	// Attach interrupts for rain and wind speed sensors
 	attachInterrupt(windSpeedSensor, windSpeedEvent, RISING);
 	attachInterrupt(rainSensor, rainEvent, RISING);
 
@@ -102,7 +108,6 @@ void sendPost() {
 		Serial.println("Server connection failed.");
 		return;
 	}
-
 	Serial.println("New connection: creating POST");
 
 	// Get geolocation
@@ -137,7 +142,7 @@ void sendPost() {
 	// Stop the current connection
 	client.stop();
 
-	Serial.println("Post function done");
+	//Serial.println("Post function done");
 }
 
 // Read data from a register on a device (I2C)
@@ -194,14 +199,14 @@ int getScaleFact(int reg) {
 // Initial setup for barometer sensor
 void getBarometerSetup() {
 
-	// Set pressure config
+	// Set pressure config (oversampling value)
 	Wire.beginTransmission(bht_sensor); // 0x77 -> addresse de barometer
 	int temp_cfg = 0x06;
 	Wire.write(temp_cfg);
 	Wire.write(0b00000011);
 	Wire.endTransmission();
 
-	// Set temp config
+	// Set temp config (coeff source and oversampling value)
 	uint8_t temp_coeff_src[1];
 	readData(bht_sensor, 0x28, 1, temp_coeff_src);
 	uint8_t temp_config = (temp_coeff_src[0] & 0b10000000) | 0b00000011;
@@ -255,11 +260,12 @@ void getValuesBarometer() {
 	uint8_t barometerValues[3];
 	readData(bht_sensor, psr_b2, 3, barometerValues);
 
+	// Adjust pressure value from multiple registers to one number
 	uint32_t pressureValue = (barometerValues[0] << 16) | (barometerValues[1] << 8) | barometerValues[2];
-
 	int32_t pressureSigned = pressureValue;
 	comp2(&pressureSigned, 24);
 
+	// Adjust pressure value with scale factor
 	int barometer_scale_fact = getScaleFact(0x06);
 	float pressureSignedF = pressureSigned;
 	pressureSignedF /= barometer_scale_fact;
@@ -270,11 +276,12 @@ void getValuesBarometer() {
 	uint8_t temperature_values[3];
 	readData(bht_sensor, tmp_b2, 3, temperature_values);
 
+	// Adjust temperature value from multiple registers to one number
 	uint32_t temperature_value = (temperature_values[0] << 16) | (temperature_values[1] << 8) | temperature_values[2];
-
 	int32_t tempSigned = temperature_value;
 	comp2(&tempSigned, 24);
 
+	// Adjust temperature value with scale factor
 	int temperature_scale_fact = getScaleFact(0x07);
 	float tempSignedF = tempSigned;
 	tempSignedF /= (float)temperature_scale_fact;
@@ -284,31 +291,37 @@ void getValuesBarometer() {
 	float p_comp = c00 + pressureSignedF * (c10 + pressureSignedF * (c20 + pressureSignedF * c30)) + tempSignedF * (c01 + pressureSignedF * (c11 + pressureSignedF * c21));
 	float t_comp = c0*0.5 + c1*tempSignedF;
 
+	// Change units to kPa
 	float p_comp_kPa = p_comp / 1000.0;
+	pressureCurrentValue = p_comp_kPa;
+
 	// printFloat("Final pressure p_comp (kPa): ", p_comp_kPa);
 	// printFloat("Final temperature t_comp: ", t_comp);
-
-	pressureCurrentValue = p_comp_kPa;
+	
 }
 
 // Read, compute and store a reading from humidity sensor
 void getValuesHumidity() {
 	int dhtPin = humidSensor;
 
-	noInterrupts();
+	// Put pin high to send signal after
 	digitalWrite(dhtPin, HIGH);
 	delay(250);
+
+	// Remove interrupts to ensure correct timings
+	noInterrupts();
 
 	// Start signal
 	digitalWrite(dhtPin, LOW);
 	delay(20);
 	digitalWrite(dhtPin, HIGH);
 	delayMicroseconds(40);
-	pinMode(humidSensor, INPUT);
 
-	// DHT low then high, maybe replace with a pulseIn(HIGH)
+	// Read GHT acknowledgment to start communication
+	pinMode(humidSensor, INPUT);
 	pulseIn(dhtPin, HIGH);
 
+	// Get data
 	int pulseTimes[40];
 	for (int i = 0; i < 40; i++) {
 		pulseTimes[i] = pulseIn(dhtPin, HIGH); // Do not execute anything in loop (will throw off timing)
@@ -318,6 +331,7 @@ void getValuesHumidity() {
 	pinMode(humidSensor, OUTPUT);
 	digitalWrite(dhtPin, LOW);
 
+	// Check pulse lengths saved and add correct bits into correct arrays
 	uint8_t dataBits[5] = {0};
 	for (int i = 0; i < 5; i++) {
 		for (int j = 0; j < 8; j++) {
@@ -334,6 +348,7 @@ void getValuesHumidity() {
 	int temp = dataBits[2];
 	int tempDecimal = dataBits[3];
 
+	// Check checksum, if wrong, dont update
 	int checkSum = dataBits[0] + dataBits[1] + dataBits[2] + dataBits[3];
 	if ((checkSum & 0b11111111) != dataBits[4]) {
 		// printDec("CHECKSUM ERROR: Checksum obtained: ", checkSum & 0b11111111);
@@ -345,12 +360,10 @@ void getValuesHumidity() {
 		humidityDecimalCurrentValue = humidDecimal;
 		temperatureCurrentValue = temp;
 		temperatureDecimalCurrentValue = tempDecimal;
-	
 	}
 
 	// printFloat("*DHT11* Temperature value: ", temp);
 	// printFloat("*DHT11* Humidity value: ", humid);
-
 }
 
 // Read, compute and store a reading from wind direction sensor
@@ -359,7 +372,7 @@ void getValuesWindDirection() {
 
 	int voltage_array[16] = {3840, 1980, 2250, 410, 450, 320, 900, 620, 1400, 1190, 3080, 2930, 4620, 4040, 4330, 3430};
 
-	// Find value that is closest and save index
+	// Find predefined voltage that is closest and save index
 	int closest_ind = 0;
 	int smallest_delta = 99999;
 	for (int i = 0; i < 16; i++) {
@@ -370,15 +383,11 @@ void getValuesWindDirection() {
 		}
 	}
 
-	// Get direction
+	// Get direction for index found
 	float direction_array[16] = {0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5, 180, 202.5, 225, 247.5, 270, 292.5, 315, 337.5};
 	float direction_deg = direction_array[closest_ind];
 
-	// printDec("Voltage read: ", voltage_read);
-	// printFloat("Final direction: ", direction_deg);
-
 	windDirectionCurrentValue = direction_deg;
-	printFloat("Wind direction: ", windDirectionCurrentValue);
 }
 
 // Read, compute and store a reading from wind speed sensor
@@ -393,7 +402,7 @@ void windSpeedEvent() {
 			return;
 		}
 
-		// 2.4 km/h / s
+		// Calculate wind speed in km/h
 		float wind_speed = (1000.0 / (float)time_since_last_event) * 2.4;
 
 		windSpeedCurrentValue = wind_speed;
@@ -411,6 +420,7 @@ void rainEvent() {
 	if (time_since_last_event > 600) {
 		printDec("Time since last rain event: ", time_since_last_event);
 
+		// Calculate rain in mm/min from last time to current time
 		rainCurrentValue = 0.2794 / time_since_last_event * 1000 * 60;
 		Serial.println(rainCurrentValue);
 		
@@ -448,8 +458,8 @@ void sendData(){
 
 	sendPost();
 
+	// Turn WiFi off
 	Particle.disconnect();
-	//WiFi.disconnect();
 	WiFi.off();
 	Serial.println("WiFi off");
 }
@@ -457,22 +467,26 @@ void sendData(){
 // Main program loop
 void loop() {
 
+	// Sensor polling delay
 	delay(1000);
 
+	// Main loop to get values from sensors that are not on interrupts
 	getValuesLight();
 	getValuesBarometer();
 	getValuesHumidity();
 	getValuesWindDirection();
 
+	// Every x seconds (10 or 60), connect to server through WiFi and send JSON data
 	time_t currentTime = Time.now();
 	if (locationAcquired){
 		if (currentTime - lastWifiPostTime > 10) {
 
+			// Activate WiFi module
 			WiFi.on();
-			//WiFi.connect();
 			Particle.connect();
 			Serial.println("WiFi starting");
 
+			// When WiFi is ready, send Data. If not, keep looping.
 			if (WiFi.ready()){
 				sendData();
 				lastWifiPostTime = currentTime;
@@ -480,6 +494,7 @@ void loop() {
 		}
 	}
 	else {
+		// If location not yet acquiered, keep "giving time" to locator
 		locator.loop();
 	}
 	
