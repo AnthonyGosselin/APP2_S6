@@ -433,7 +433,7 @@ void rainEvent() {
 		// Calculate rain in mm/min from last time to current time
 		float rain_rate = 0.2794 / time_since_last_event * 1000 * 60;
 
-		rainCurrentValue = rain_rate
+		rainCurrentValue = rain_rate;
 		// Serial.println(rainCurrentValue);
 	}
 
@@ -478,7 +478,7 @@ void sendData(){
 void resetInterruptTimes(){
 	int currentTimeMs = millis();
 
-	// Check if rain event happened more than 1 hour ago
+	// Check if rain event happened more than one hour ago
 	if (currentTimeMs - lastRainEventTime >  (1*1000*60*60)){
 		lastRainEventTime = 0;
 	}
