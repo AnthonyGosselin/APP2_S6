@@ -29,18 +29,22 @@ const int rainSensor = D4;
 float windSpeedCurrentValue = 0;
 float windDirectionCurrentValue = 0;
 float temperatureCurrentValue = 0;
-float temperatureDecimalCurrentValue = 0;
 float pressureCurrentValue = 0;
 float humidityCurrentValue = 0;
 float humidityDecimalCurrentValue = 0;
 float rainCurrentValue = 0;
 float luminosityCurrentValue = 0;
-
 String geolocationCurrentValue = "no location";
 
 // Global time counters 
 int lastWindSpeedEventTime = 0;
 int lastRainEventTime = 0;
+
+// Adjustable time variables
+int loopDelay = 1000;	// milliseconds
+int postDelay = 10;		// seconds
+int sensorTimerResetDelay = 1 * 1000 * 60 * 10;	// Ten minute delay between resets
+int sensorValueAdjustingDelay = 1 * 1000 * 60;	// One minute before adjusting values
 
 // Barometer coefficients
 int32_t c0;
@@ -104,6 +108,7 @@ void locationCallback(float lat, float lon, float accuracy) {
 void sendPost() {
 
 	// Connect to server
+	noInterrupts();
 	if(!client.connect(server, server_port)) {
 		Serial.println("Server connection failed.");
 		return;
@@ -119,7 +124,6 @@ void sendPost() {
 	"\"windSpeed\": " + String(windSpeedCurrentValue) + ","
 	"\"windDirection\": " + String(windDirectionCurrentValue) + ","
 	"\"temperature\": " + String(temperatureCurrentValue) + ","
-	"\"temperatureDecimal\": " + String(temperatureDecimalCurrentValue) + ","
 	"\"pressure\": " + String(pressureCurrentValue) + ","
 	"\"humidity\": " + String(humidityCurrentValue) + ","
 	"\"humidityDecimal\": " + String(humidityDecimalCurrentValue) + ","
@@ -141,6 +145,7 @@ void sendPost() {
 
 	// Stop the current connection
 	client.stop();
+	interrupts();
 
 	//Serial.println("Post function done");
 }
@@ -200,7 +205,7 @@ int getScaleFact(int reg) {
 void getBarometerSetup() {
 
 	// Set pressure config (oversampling value)
-	Wire.beginTransmission(bht_sensor); // 0x77 -> addresse de barometer
+	Wire.beginTransmission(bht_sensor); // 0x77 -> barometer address
 	int temp_cfg = 0x06;
 	Wire.write(temp_cfg);
 	Wire.write(0b00000011);
@@ -211,19 +216,20 @@ void getBarometerSetup() {
 	readData(bht_sensor, 0x28, 1, temp_coeff_src);
 	uint8_t temp_config = (temp_coeff_src[0] & 0b10000000) | 0b00000011;
 
-	Wire.beginTransmission(bht_sensor); // 0x77 -> addresse de barometer
+	Wire.beginTransmission(bht_sensor); // 0x77 -> barometer address
 	int prs_cfg = 0x07;
 	Wire.write(prs_cfg);
 	Wire.write(temp_config);
 	Wire.endTransmission();
 
-	// Set continuous reading for barometer and temperature
-	Wire.beginTransmission(bht_sensor); // 0x77 -> addresse de barometer
-	int meas_cfg = 0x08;
-	Wire.write(meas_cfg);
-	Wire.write(0b00000111);
-	Wire.endTransmission();
 
+	// Wait for coefficients to be ready to be read and sensor to finish init
+	uint8_t coeff_ready[1];
+	readData(bht_sensor, 0x08, 1, coeff_ready);
+	while ((coeff_ready[0] & 0b11000000) != 0b11000000) {
+		Serial.println("Coeff sensor wait");
+		delay(5);
+	}
 
 	// Read calibration coefficients
 	uint8_t calib_coeffs[18];
@@ -250,6 +256,15 @@ void getBarometerSetup() {
 	comp2(&c30, 16);
 
 	//Serial.printlnf("Coeff: %d, %d, %d, %d, %d, %d, %d, %d, %d", c0, c1, c00, c10, c01, c11, c20, c21, c30);
+
+	// Prepare barometer pression and temperature tu be read in background
+	// Continous saves communication and doesnt use much power since sampling is every second
+	Wire.beginTransmission(bht_sensor); // 0x77 -> barometer address
+	int meas_cfg = 0x08;
+	Wire.write(meas_cfg);
+	Wire.write(0b00000111);
+	Wire.endTransmission();
+
 }
 
 // Read, compute and store a reading from barometer sensor
@@ -295,8 +310,13 @@ void getValuesBarometer() {
 	float p_comp_kPa = p_comp / 1000.0;
 	pressureCurrentValue = p_comp_kPa;
 
-	// printFloat("Final pressure p_comp (kPa): ", p_comp_kPa);
-	// printFloat("Final temperature t_comp: ", t_comp);
+	// Using barometer temperature values since
+	// 1) Can go under 0 degrees
+	// 2) Has a precision of 0.5 instead of 1 or 2
+	temperatureCurrentValue = t_comp;
+
+	printFloat("Final pressure p_comp (kPa): ", p_comp_kPa);
+	printFloat("Final temperature t_comp: ", t_comp);
 	
 }
 
@@ -358,8 +378,7 @@ void getValuesHumidity() {
 	else {
 		humidityCurrentValue = humid;
 		humidityDecimalCurrentValue = humidDecimal;
-		temperatureCurrentValue = temp;
-		temperatureDecimalCurrentValue = tempDecimal;
+		// Doesnt use humidity sensor for temperature since it doesnt go under 0 and isnt precise (+/- 1 or 2)
 	}
 
 	// printFloat("*DHT11* Temperature value: ", temp);
@@ -434,7 +453,7 @@ void rainEvent() {
 		float rain_rate = 0.2794 / time_since_last_event * 1000 * 60;
 
 		rainCurrentValue = rain_rate;
-		// Serial.println(rainCurrentValue);
+		Serial.println(rainCurrentValue);
 	}
 
 	lastRainEventTime = current_millis;
@@ -475,16 +494,39 @@ void sendData(){
 	Serial.println("WiFi off");
 }
 
+// Reset time values for interrupts if didn't happen for 
 void resetInterruptTimes(){
 	int currentTimeMs = millis();
 
-	// Check if rain event happened more than one hour ago
-	if (currentTimeMs - lastRainEventTime >  (1*1000*60*60)){
-		lastRainEventTime = 0;
+	// Check when last rain event happened and adjust results
+	int timeSinceLastRainEvent = currentTimeMs - lastRainEventTime;
+	if (timeSinceLastRainEvent > sensorValueAdjustingDelay){
+
+		// Reduce rain value every 1 min without rain
+		rainCurrentValue *= 0.5;
+
+		if (timeSinceLastRainEvent >  sensorTimerResetDelay && lastRainEventTime != 0){
+
+			// Reset rain timer if no rain for 10 min
+			lastRainEventTime = 0;
+			Serial.println("Rain timer reset");
+		}
 	}
-	// Check if wind event happened more than one hour ago
-	if (currentTimeMs - lastWindSpeedEventTime >  (1*1000*60*60)){
-		lastWindSpeedEventTime = 0;
+	
+
+	// Check when last wind event happened and adjust results
+	int timeSinceLastWindEvent = currentTimeMs - lastWindSpeedEventTime;
+	if (timeSinceLastRainEvent > sensorValueAdjustingDelay){
+
+		// Reduce wind value every 1 min without wind
+		windSpeedCurrentValue *= 0.5;
+
+		if (timeSinceLastWindEvent >  lastWindSpeedEventTime && lastWindSpeedEventTime != 0){
+
+			// Reset wind timer if no wind for 10 min
+			lastWindSpeedEventTime = 0;
+			Serial.println("Wind timer reset");
+		}
 	}
 
 }
@@ -493,7 +535,7 @@ void resetInterruptTimes(){
 void loop() {
 
 	// Sensor polling delay
-	delay(1000);
+	delay(loopDelay);
 
 	// Main loop to get values from sensors that are not on interrupts
 	getValuesLight();
@@ -508,7 +550,7 @@ void loop() {
 	// Every x seconds (10 or 60), connect to server through WiFi and send JSON data
 	time_t currentTime = Time.now();
 	if (locationAcquired){
-		if (currentTime - lastWifiPostTime > 10) {
+		if (currentTime - lastWifiPostTime > postDelay) {
 
 			// Activate WiFi module
 			WiFi.on();
