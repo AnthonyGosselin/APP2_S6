@@ -3,13 +3,9 @@
     "C_Cpp.default.configurationProvider": "particle.particle-vscode-core",
     "cortex-debug.openocdPath": "${command:particle.getDebuggerOpenocdPath}",
     "files.associations": {
-<<<<<<< HEAD
         "*.ino": "cpp",
         "cmath": "cpp"
-    }
-=======
-        "*.ino": "cpp"
     },
-    "particle.targetDevice": ""
->>>>>>> fce07ec1366b9dd3c79b3570d8cc93c100d3913f
+    "particle.targetDevice": "argonEDS",
+    "particle.targetPlatform": "argon"
 }

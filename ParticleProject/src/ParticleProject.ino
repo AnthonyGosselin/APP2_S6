@@ -1,7 +1,7 @@
 #include <../lib/google-maps-device-locator/src/google-maps-device-locator.h>
 #include <math.h>
 
-//SYSTEM_MODE(SEMI_AUTOMATIC);
+SYSTEM_MODE(SEMI_AUTOMATIC);
 
 // Server variables
 TCPClient client;
@@ -18,10 +18,10 @@ float _accuracy;
 
 // Argon pins
 uint8_t bht_sensor = 0x77;
-const int lightSensor = A0;
+const int lightSensor = A2;
 const int humidSensor = D2;
-const int windSensor = A2;
-const int windSpeedSensor = A3;
+const int windSensor = A0;
+const int windSpeedSensor = A1;
 const int rainSensor = D4;
 
 // Current values (used to transmit)
@@ -68,7 +68,10 @@ void setup() {
 	locator.withSubscribe(locationCallback).withLocateOnce();
 	// locator.withSubscribe(locationCallback).withLocatePeriodic(30);
 
-	pinMode(lightSensor, OUTPUT);
+	pinMode(lightSensor, INPUT);
+	pinMode(windSensor, INPUT);
+	pinMode(windSpeedSensor, INPUT);
+	pinMode(rainSensor, INPUT);
 	pinMode(humidSensor, OUTPUT);
 	digitalWrite(humidSensor, HIGH); // DHT11 starts high
 
@@ -362,12 +365,13 @@ void getValuesWindDirection() {
 	// printFloat("Final direction: ", direction_deg);
 
 	windDirectionCurrentValue = direction_deg;
+	printFloat("Wind direction: ", windDirectionCurrentValue);
 }
 
 void windSpeedEvent() {
 
 	int current_millis = millis();
-	if (current_millis != 0) {
+	if (lastWindSpeedEventTime != 0) {
 		int time_since_last_event = current_millis - lastWindSpeedEventTime;
 
 		// Ignore bounce
@@ -375,14 +379,12 @@ void windSpeedEvent() {
 			return;
 		}
 
-		//printDec("Wind speed new delta: ", time_since_last_event);
-
 		// 2.4 km/h / s
 		float wind_speed = (1000.0 / (float)time_since_last_event) * 2.4;
-		printFloat("Current wind speed: ", wind_speed);
 
 		windSpeedCurrentValue = wind_speed;
 	}
+
 	lastWindSpeedEventTime = current_millis;
 }
 
@@ -394,7 +396,8 @@ void rainEvent() {
 	if (time_since_last_event > 600) {
 		printDec("Time since last rain event: ", time_since_last_event);
 
-		rainCurrentValue += 0.2794; // Every event is equivalent to 0.2794 mm
+		rainCurrentValue = 0.2794 / time_since_last_event * 1000 * 60;
+		Serial.println(rainCurrentValue);
 		
 		lastRainEventTime = current_millis;
 	}
@@ -402,27 +405,36 @@ void rainEvent() {
 }
 
 void getValuesLight() {
-	int result = analogRead(lightSensor);
-	//Serial.printlnf("Light sensor: %d mV", result);
+	float vIn = analogRead(lightSensor) * 3.3 / 4096.0;
+	Serial.printlnf("Light sensor: %f V", vIn);
+
+	float resistor = 68000.0;
+
+	// float vcc = 3.3;
+	// float satV = 2;
+	// float maxV = vcc - satV;
+
+	// float lux = vIn / maxV * 100;
+
+	float b = 10.0 * pow(10, -9);
+	float m = (100.0 - 0.0) / (239.5*pow(10, -6) - b);
+	float currentValue = (float)vIn / resistor;
+	float lux = currentValue*m + b;
+
+	luminosityCurrentValue = lux;
+	Serial.printlnf("Light sensor: %f lux", lux);
 }
 
 void sendData(){
 
-	// WiFi.on();
-	// WiFi.connect();
-	// Particle.connect();
-	// Serial.println("WiFi on");
+	Serial.println("WiFi on");
 
-	// while (!WiFi.ready()){
-	// 	delay(100);
-	// }
 	sendPost();
-	//delay(10000);
 
-	// Particle.disconnect();
-	// WiFi.disconnect();
-	// WiFi.off();
-	// Serial.println("WiFi off");
+	Particle.disconnect();
+	//WiFi.disconnect();
+	WiFi.off();
+	Serial.println("WiFi off");
 }
 
 
@@ -438,8 +450,16 @@ void loop() {
 	time_t currentTime = Time.now();
 	if (locationAcquiered){
 		if (currentTime - lastWifiPostTime > 10) {
-			sendData();
-			lastWifiPostTime = currentTime;
+
+			WiFi.on();
+			//WiFi.connect();
+			Particle.connect();
+			Serial.println("WiFi starting");
+
+			if (WiFi.ready()){
+				sendData();
+				lastWifiPostTime = currentTime;
+			}
 		}
 	}
 	else {

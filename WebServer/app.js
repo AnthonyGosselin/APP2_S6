@@ -51,7 +51,7 @@ function renderPage(res) {
 	res.writeHead(200, {'Content-Type': 'text/html'});
 	res.write(newHtmlContent())
 	res.end()
-	initMap()
+	//initMap()
 }
 
 app.get('/', (req, res) => {
