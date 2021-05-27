@@ -35,7 +35,7 @@ function newHtmlContent() {
 			<h2>Temperature: ${currentTemperature}.${currentTemperatureDecimal} C</h2>
 			<h2>Pressure: ${currentPressure} kPa</h2>
 			<h2>Humidity: ${currentHumidity}.${currentHumidityDecimal} %</h2>
-			<h2>Rain: ${currentRain} mm</h2>
+			<h2>Rain: ${currentRain} mm/min</h2>
 			<h2>Luminosity: ${currentLuminosity} lx?</h2>
 		<br>
 			<h2>Location: ${currentLocation}</h2>
