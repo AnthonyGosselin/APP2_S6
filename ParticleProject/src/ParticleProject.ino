@@ -53,12 +53,13 @@ int32_t c21;
 int32_t c30;
 
 // Wifi connection timer
-bool locationAcquiered = false;
+bool locationAcquired = false;
 time_t lastWifiPostTime = 0;
 
 // Oversampling rate and scale factors
 int scale_factors[8] = {524288, 1572864, 3670016, 7864320, 253952, 516096, 1040384, 2088960};
 
+// Initial connections and setups
 void setup() {
 	WiFi.on();
 	Particle.connect();
@@ -84,14 +85,16 @@ void setup() {
 	Serial.println("Setup complete.");
 }
 
+// Function called by Google Maps integration to return location
 void locationCallback(float lat, float lon, float accuracy) {
 
-	locationAcquiered = true;
+	locationAcquired = true;
 	_latitude = lat;
 	_longitude = lon;
 	_accuracy = accuracy;
 }
 
+// Connects to server and builds POST request to send to server
 void sendPost() {
 
 	// Connect to server
@@ -103,8 +106,9 @@ void sendPost() {
 	Serial.println("New connection: creating POST");
 
 	// Get geolocation
-	geolocationCurrentValue = String(_latitude) + ", " + String(_longitude) + ", " + String(_accuracy);
+	geolocationCurrentValue = String(_latitude) + ", " + String(_longitude) + " (" + String(_accuracy) + " m)";
 
+	// Build JSON payload
 	String postVal = ""
 	"{" 
 	"\"windSpeed\": " + String(windSpeedCurrentValue) + ","
@@ -136,7 +140,7 @@ void sendPost() {
 	Serial.println("Post function done");
 }
 
-
+// Read data from a register on a device (I2C)
 void readData(int device_addr, int reg, int num_bytes, uint8_t *registerValues) {
 	Wire.beginTransmission(device_addr);
 	Wire.write(reg);
@@ -148,24 +152,28 @@ void readData(int device_addr, int reg, int num_bytes, uint8_t *registerValues) 
 	}
 }
 
+// Print number in binary form
 void printBin(char* text, int value) {
 	Serial.print(text);
 	Serial.print(value, BIN);
 	Serial.println();
 }
 
+// Print number in decimal (base 10) form
 void printDec(char* text, int value) {
 	Serial.print(text);
 	Serial.print(value);
 	Serial.println();
 }
 
+// Print float
 void printFloat(char* text, float value) {
 	Serial.print(text);
 	Serial.printf("%.4f", value);
 	Serial.println();
 }
 
+// 2's complement conversion of binary with defined number of bits 'length'
 void comp2(int32_t *binary_input, int length)
 {
 	if (*binary_input > (pow(2, length - 1) - 1)) {
@@ -173,6 +181,7 @@ void comp2(int32_t *binary_input, int length)
 	}
 }
 
+// Useful to read scale factor on barometer sensor
 int getScaleFact(int reg) {
 	uint8_t oversample_register_data[1];
 	readData(bht_sensor, reg, 1, oversample_register_data);
@@ -182,6 +191,7 @@ int getScaleFact(int reg) {
 	return scale_fact;
 }
 
+// Initial setup for barometer sensor
 void getBarometerSetup() {
 
 	// Set pressure config
@@ -237,6 +247,7 @@ void getBarometerSetup() {
 	//Serial.printlnf("Coeff: %d, %d, %d, %d, %d, %d, %d, %d, %d", c0, c1, c00, c10, c01, c11, c20, c21, c30);
 }
 
+// Read, compute and store a reading from barometer sensor
 void getValuesBarometer() {
 
 	// Read barometer
@@ -280,6 +291,7 @@ void getValuesBarometer() {
 	pressureCurrentValue = p_comp_kPa;
 }
 
+// Read, compute and store a reading from humidity sensor
 void getValuesHumidity() {
 	int dhtPin = humidSensor;
 
@@ -341,6 +353,7 @@ void getValuesHumidity() {
 
 }
 
+// Read, compute and store a reading from wind direction sensor
 void getValuesWindDirection() {
 	int voltage_read = analogRead(windSensor) * (5000/4096.0);
 
@@ -368,6 +381,7 @@ void getValuesWindDirection() {
 	printFloat("Wind direction: ", windDirectionCurrentValue);
 }
 
+// Read, compute and store a reading from wind speed sensor
 void windSpeedEvent() {
 
 	int current_millis = millis();
@@ -388,6 +402,7 @@ void windSpeedEvent() {
 	lastWindSpeedEventTime = current_millis;
 }
 
+// Read, compute and store a reading from anemometer sensor (rainfall)
 void rainEvent() {
 	int current_millis = millis();
 
@@ -404,6 +419,7 @@ void rainEvent() {
 
 }
 
+// Read, compute and store a reading from light sensor
 void getValuesLight() {
 	float vIn = analogRead(lightSensor) * 3.3 / 4096.0;
 	Serial.printlnf("Light sensor: %f V", vIn);
@@ -425,6 +441,7 @@ void getValuesLight() {
 	Serial.printlnf("Light sensor: %f lux", lux);
 }
 
+// Handles enabling and disabling WIFI for sending data
 void sendData(){
 
 	Serial.println("WiFi on");
@@ -437,7 +454,7 @@ void sendData(){
 	Serial.println("WiFi off");
 }
 
-
+// Main program loop
 void loop() {
 
 	delay(1000);
@@ -448,7 +465,7 @@ void loop() {
 	getValuesWindDirection();
 
 	time_t currentTime = Time.now();
-	if (locationAcquiered){
+	if (locationAcquired){
 		if (currentTime - lastWifiPostTime > 10) {
 
 			WiFi.on();
