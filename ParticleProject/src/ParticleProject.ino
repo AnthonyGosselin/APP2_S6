@@ -9,6 +9,7 @@ TCPClient client;
 byte server[] = { 192, 168, 0, 106 };
 String ip = "192.168.0.106";
 //byte server[] = { 192, 168, 1, 6 };
+//String ip = "192.168.1.6";
 int server_port = 3000;
 
 // Google maps variables
@@ -315,8 +316,8 @@ void getValuesBarometer() {
 	// 2) Has a precision of 0.5 instead of 1 or 2
 	temperatureCurrentValue = t_comp;
 
-	printFloat("Final pressure p_comp (kPa): ", p_comp_kPa);
-	printFloat("Final temperature t_comp: ", t_comp);
+	// printFloat("Final pressure p_comp (kPa): ", p_comp_kPa);
+	// printFloat("Final temperature t_comp: ", t_comp);
 	
 }
 
@@ -337,7 +338,7 @@ void getValuesHumidity() {
 	digitalWrite(dhtPin, HIGH);
 	delayMicroseconds(40);
 
-	// Read GHT acknowledgment to start communication
+	// Read DHT acknowledgment to start communication
 	pinMode(humidSensor, INPUT);
 	pulseIn(dhtPin, HIGH);
 
@@ -461,7 +462,7 @@ void rainEvent() {
 
 // Read, compute and store a reading from light sensor
 void getValuesLight() {
-	float vIn = analogRead(lightSensor) * 3.3 / 4096.0;
+	float vIn = analogRead(lightSensor) * 3300 / 4096.0;		// Ajuster pour l'analogique (Vcc = 3.3, 2^12 = 4096)
 	Serial.printlnf("Light sensor: %f V", vIn);
 
 	float resistor = 68000.0;
@@ -543,7 +544,7 @@ void loop() {
 	getValuesHumidity();
 	getValuesWindDirection();
 
-	// Reset sensors depending on time (windSpeed, rain) if last time was very long ago
+	// Reset sensors depending on time counter (windSpeed, rain) if last time was very long ago
 	resetInterruptTimes();
 
 
